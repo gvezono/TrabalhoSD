@@ -24,6 +24,16 @@ public class ThreadConexao implements Runnable {
     @Override
     public void run() {
         boolean conn = true;
+        /*
+        Date d = new Date();
+        if(d.getHours() < 8 || d.getHours() > 18){
+            try {
+                socket.close();
+            } catch (IOException ex) {
+                Logger.getLogger(ThreadConexao.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            conn = false;
+        }*/
         while (conn) {
             if (socket.isClosed()) {
                 conn = false;
