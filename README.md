@@ -26,7 +26,7 @@ Clone o projeto e entre na pasta do projeto
 git clone https://github.com/gvezono/TrabalhoSD.git && cd TrabalhoSD
 ```
 
-Entre na pasta do projeto e compile usando o ant
+Compile usando o ant
 
   - Servidor
 ```
