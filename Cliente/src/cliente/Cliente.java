@@ -85,8 +85,12 @@ public class Cliente {
                         List<String> lista = resposta.getCabecalho().get("Lista");
                         System.out.println("Arquivos no servidor:");
                         int i = 1;
-                        for (String nome : lista) {
-                            System.out.println((i++) + " " + nome.trim());
+                        if (lista.size() > 0) {
+                            System.out.println("Nenhum arquivo encontrado!");
+                        } else {
+                            for (String nome : lista) {
+                                System.out.println((i++) + " " + nome.trim());
+                            }
                         }
                         System.out.println("Pressione enter para continuar ...");
                         sc.nextLine();
