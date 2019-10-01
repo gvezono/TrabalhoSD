@@ -1,6 +1,12 @@
 # TrabalhoSD
 Repositório destinado à desenvolvimento e apresentação da matéria Sistemas Distribuídos.
 
+## Alunos
+Tiago Henrique
+Gabriel Vezono
+Victor Melazo
+Carolina Alves
+
 # Entrega 0
 Formalização do projeto: o mesmo consiste em criar um servidor local de empresa com departamento de licitações, já que, nessa área geram muitos documentos. Sendo assim, é interessante ter um servidor para armazenar tantos itens que provavelmente não serão mais acessados, porém, precisam ser armazenados pela empresa por possíveis futuros motivos de consulta.
 
@@ -10,12 +16,12 @@ Testes:
 
 # Entrega 1
 ### Requisitos
-Java e JDK >=7
+Java JDK >= 7
 ```
 sudo apt-get install default-jre
 sudo apt-get install default-jdk
 ```
-Apache Ant >=1.8
+Apache Ant >= 1.8
 ```
 sudo apt-get install ant
 ```
