@@ -174,6 +174,7 @@ public class ThreadConexao implements Runnable {
                 }
             } catch (IOException ex) {
                 Logger.getLogger(ThreadConexao.class.getName()).log(Level.SEVERE, null, ex);
+                conn = false;
             }
         }
         if (!socket.isClosed()) {

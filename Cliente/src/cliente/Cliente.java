@@ -85,7 +85,7 @@ public class Cliente {
                         List<String> lista = resposta.getCabecalho().get("Lista");
                         System.out.println("Arquivos no servidor:");
                         int i = 1;
-                        if (lista.size() > 0) {
+                        if (lista.size() <= 1 && lista.get(0).equals("")) {
                             System.out.println("Nenhum arquivo encontrado!");
                         } else {
                             for (String nome : lista) {

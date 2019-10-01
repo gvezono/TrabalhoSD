@@ -31,10 +31,8 @@ public class Requisicao {
     public static Requisicao lerRequisicao(InputStream entrada) throws IOException {
         Requisicao requisicao = new Requisicao();
         BufferedReader buffer = new BufferedReader(new InputStreamReader(entrada, "ISO-8859-1"));
-        Logger.getLogger(Requisicao.class.getName()).log(Level.INFO, "Requisição: ");
         String dadosHeader = buffer.readLine();
         while (dadosHeader != null && !dadosHeader.isEmpty()) {
-            Logger.getLogger(Requisicao.class.getName()).log(Level.INFO, dadosHeader);
             String[] linhaCabecalho = dadosHeader.split(":");
             requisicao.setCabecalho(linhaCabecalho[0], linhaCabecalho[1].trim().split(","));
             dadosHeader = buffer.readLine();
