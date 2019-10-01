@@ -16,24 +16,27 @@ import java.util.logging.Logger;
 public class ThreadConexao implements Runnable {
 
     private final Socket socket;
+    private final boolean restricao;
 
-    public ThreadConexao(Socket socket) {
+    public ThreadConexao(Socket socket, boolean restricao) {
         this.socket = socket;
+        this.restricao = restricao;
     }
 
     @Override
     public void run() {
         boolean conn = true;
-        /*
-        Date d = new Date();
-        if(d.getHours() < 8 || d.getHours() > 18){
-            try {
-                socket.close();
-            } catch (IOException ex) {
-                Logger.getLogger(ThreadConexao.class.getName()).log(Level.SEVERE, null, ex);
+        if (restricao) {
+            Date d = new Date();
+            if (d.getHours() < 8 || d.getHours() > 18) {
+                try {
+                    socket.close();
+                } catch (IOException ex) {
+                    Logger.getLogger(ThreadConexao.class.getName()).log(Level.SEVERE, null, ex);
+                }
+                conn = false;
             }
-            conn = false;
-        }*/
+        }
         while (conn) {
             if (socket.isClosed()) {
                 conn = false;
@@ -41,7 +44,7 @@ public class ThreadConexao implements Runnable {
             }
             try {
                 Path dirsv = Paths.get("SERVIDOR");
-                if(Files.notExists(dirsv)){
+                if (Files.notExists(dirsv)) {
                     File file = new File(dirsv.toUri());
                     file.mkdir();
                 }

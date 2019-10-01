@@ -40,8 +40,14 @@ cd Cliente && ant jar && cd ..
 
 ### Executando
   - Servidor
+
+Sem restrição de horário
 ```
 java -jar Servidor/dist/Servidor.jar
+```
+Com restrição de horário - pode ser acessado das 8h às 18h
+```
+java -jar Servidor/dist/Servidor.jar restricao
 ```
   - Cliente
 ```
