@@ -3,8 +3,11 @@ Repositório destinado à desenvolvimento e apresentação da matéria Sistemas 
 
 ## Alunos
 Tiago Henrique
+
 Gabriel Vezono
+
 Victor Melazo
+
 Carolina Alves
 
 # Entrega 0
