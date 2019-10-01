@@ -9,29 +9,40 @@ Testes:
   - Demonstração de funcionalidades: conseguir enviar/acessar arquivos sem erros, mostrar o impedimento de acesso ao servidor com base no horário.
 
 # Entrega 1
-Requisitos:
-  - Java e JDK >=7
-  - Apache Ant >=1.8
-
-1. Clone o projeto:
+### Requisitos
+Java e JDK >=7
 ```
-git clone https://github.com/gvezono/TrabalhoSD.git
+sudo apt-get install default-jre
+sudo apt-get install default-jdk
+```
+Apache Ant >=1.8
+```
+sudo apt-get install ant
 ```
 
-2. Entre na pasta do projeto e compile:
-
+### Instalando
+Clone o projeto e entre na pasta do projeto
 ```
-cd TrabalhoSD
+git clone https://github.com/gvezono/TrabalhoSD.git && cd TrabalhoSD
+```
+
+Entre na pasta do projeto e compile usando o ant
+
+  - Servidor
+```
 cd Servidor && ant jar && cd ..
+```
+  - Cliente
+```
 cd Cliente && ant jar && cd ..
 ```
 
-3. Executando:
-  - Servidor:
+### Executando
+  - Servidor
 ```
 java -jar Servidor/dist/Servidor.jar
 ```
-  - Cliente:
+  - Cliente
 ```
 java -jar Cliente/dist/Cliente.jar
 ```
