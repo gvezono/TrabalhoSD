@@ -2,13 +2,13 @@
 Repositório destinado à desenvolvimento e apresentação da matéria Sistemas Distribuídos.
 
 ## Alunos
-Tiago Henrique
+Tiago Henrique  11411BSI204
 
-Gabriel Vezono
+Gabriel Vezono  11611BCC050
 
-Victor Melazo
+Victor Melazo   11611BCC028
 
-Carolina Alves
+Carolina Alves  11411BSI234
 
 # Entrega 0
 Formalização do projeto: o mesmo consiste em criar um servidor local de empresa com departamento de licitações, já que, nessa área geram muitos documentos. Sendo assim, é interessante ter um servidor para armazenar tantos itens que provavelmente não serão mais acessados, porém, precisam ser armazenados pela empresa por possíveis futuros motivos de consulta.
