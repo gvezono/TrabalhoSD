@@ -46,6 +46,10 @@ cd Servidor && ant jar && cd ..
 ```
 cd Cliente && ant jar && cd ..
 ```
+  - Teste de concorrência
+```
+cd Teste && ant jar && cd ..
+```
 
 ### Executando
   - Servidor
@@ -61,4 +65,8 @@ java -jar Servidor/dist/Servidor.jar restricao
   - Cliente
 ```
 java -jar Cliente/dist/Cliente.jar
+```
+  - Teste de concorrência
+```
+java -jar Teste/dist/Teste.jar
 ```
