@@ -23,7 +23,8 @@ sudo apt-get install ant
 ### Instalando
 Clone o projeto e entre na pasta do projeto
 ```
-git clone https://github.com/gvezono/TrabalhoSD.git && cd TrabalhoSD
+git clone https://github.com/gvezono/TrabalhoSD.git
+cd TrabalhoSD
 ```
 
 Compile usando o ant
