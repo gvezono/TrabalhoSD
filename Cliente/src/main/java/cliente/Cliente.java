@@ -1,7 +1,7 @@
 package cliente;
 
-import servidor.*;
 import com.google.protobuf.ByteString;
+import servidor.*;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
@@ -43,15 +43,21 @@ public class Cliente {
     }
 
     public String Enviar(String data, String nome, byte[] arquivo) throws InvalidProtocolBufferException {
-        EnviarRequest request = EnviarRequest.newBuilder()
+        EnviarRequest.Builder request = EnviarRequest.newBuilder()
                 .setData(data)
                 .setTamanho((long) arquivo.length)
-                .setNome(nome)
-                .setArquivo(ByteString.copyFrom(arquivo))
-                .build();
+                .setNome(nome);
+        long control = 0;
+        long size = arquivo.length;
+        int datalen = Integer.MAX_VALUE;
+        while ((control + datalen) < size) {
+            request = request.addArquivo(ByteString.copyFrom(arquivo, (int) control, datalen));
+            control += datalen;
+        }
+        request = request.addArquivo(ByteString.copyFrom(arquivo, (int) control, (int) (size - control)));
         EnviarReply response;
         try {
-            response = blockingStub.enviar(request);
+            response = blockingStub.enviar(request.build());
             return response.getStatus();
         } catch (StatusRuntimeException e) {
             return "RPC failed: " + e.getStatus();
@@ -88,7 +94,16 @@ public class Cliente {
         } catch (StatusRuntimeException e) {
             return new Object[]{"", "RPC failed: " + e.getStatus()};
         }
-        return new Object[]{response.getArquivo().toByteArray(), response.getStatus()};
+        int count = response.getArquivoCount();
+        long control = 0;
+        long size = response.getTamanho();
+        byte[] arq = new byte[(int) size];
+        for (int i = 0; i < count; i++) {
+            byte[] aux = response.getArquivo(i).toByteArray();
+            System.arraycopy(aux, 0, arq, (int) control, aux.length);
+            control += aux.length;
+        }
+        return new Object[]{arq, response.getStatus()};
     }
 
     public static void main(String[] args) {

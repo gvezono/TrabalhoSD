@@ -20,7 +20,7 @@ message EnviarRequest {
 	string data = 1;
 	int64 tamanho = 2;
 	string nome = 3;
-	bytes arquivo = 4;
+	repeated bytes arquivo = 4;
 }
 
 message EnviarReply {
@@ -47,6 +47,7 @@ message ReceberRequest {
 message ReceberReply {
 	string data = 1;
 	string nome = 2;
-	bytes arquivo = 3;
-	string status = 4;
+        int64 tamanho = 3;
+	repeated bytes arquivo = 4;
+	string status = 5;
 }

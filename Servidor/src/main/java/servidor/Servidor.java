@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.Locale;
 import java.util.TimeZone;
@@ -34,6 +35,7 @@ public class Servidor {
         int port = 50051;
         server = ServerBuilder.forPort(port)
                 .addService(new ServerFuncIm())
+                .maxInboundMessageSize(Integer.MAX_VALUE)
                 .build()
                 .start();
         logger.log(Level.INFO, "Server started, listening on {0}", port);
@@ -72,17 +74,26 @@ public class Servidor {
         String dataFormatada;
         String file;
         File arquivo;
-        
-        private ServerFuncIm(){
+
+        private ServerFuncIm() {
             formatador.setTimeZone(TimeZone.getTimeZone("GMT-3"));
         }
 
         @Override
-        public void enviar(EnviarRequest req, StreamObserver<EnviarReply> responseObserver){
+        public void enviar(EnviarRequest req, StreamObserver<EnviarReply> responseObserver) {
             file = req.getNome();
             arquivo = new File("SERVIDOR" + File.separator + file);
+            int count = req.getArquivoCount();
+            long control = 0;
+            long size = req.getTamanho();
+            byte[] arq = new byte[(int) size];
+            for (int i = 0; i < count; i++) {
+                byte[] aux = req.getArquivo(i).toByteArray();
+                System.arraycopy(aux, 0, arq, (int) control, aux.length);
+                control += aux.length;
+            }
             try {
-                Files.write(arquivo.toPath(), req.getArquivo().toByteArray());
+                Files.write(arquivo.toPath(), arq);
             } catch (IOException ex) {
                 Logger.getLogger(Servidor.class.getName()).log(Level.SEVERE, null, ex);
             }
@@ -130,7 +141,16 @@ public class Servidor {
             ReceberReply.Builder reply = ReceberReply.newBuilder();
             try {
                 arquivo = new File("SERVIDOR" + File.separator + file);
-                reply = reply.setArquivo(ByteString.copyFrom(Files.readAllBytes(arquivo.toPath())));
+                byte[] arq = Files.readAllBytes(arquivo.toPath());
+                long control = 0;
+                long size = arq.length;
+                int datalen = Integer.MAX_VALUE;
+                while ((control + datalen) < size) {
+                    reply = reply.addArquivo(ByteString.copyFrom(arq, (int) control, datalen));
+                    control += datalen;
+                }
+                reply.setTamanho(size);
+                reply = reply.addArquivo(ByteString.copyFrom(arq, (int) control, (int) (size - control)));
             } catch (Exception e) {
                 erro = e.getClass().getSimpleName();
             }
