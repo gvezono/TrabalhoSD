@@ -30,6 +30,7 @@ public class Cliente {
     public Cliente(String host, int port) {
         this(ManagedChannelBuilder.forAddress(host, port)
                 .usePlaintext()
+                .maxInboundMessageSize(Integer.MAX_VALUE)
                 .build());
     }
 
