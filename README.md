@@ -35,7 +35,7 @@ git clone https://github.com/gvezono/TrabalhoSD.git
 cd TrabalhoSD
 ```
 
-Compile usando o ant
+Compile usando o mvn
 
   - Servidor
 ```
