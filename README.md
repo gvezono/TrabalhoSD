@@ -10,23 +10,22 @@ Victor Melazo   11611BCC018
 
 Carolina Alves  11411BSI234
 
-# Entrega 0
+# Descrição
 Formalização do projeto: o mesmo consiste em criar um servidor local de empresa com departamento de licitações, já que, nessa área geram muitos documentos. Sendo assim, é interessante ter um servidor para armazenar tantos itens que provavelmente não serão mais acessados, porém, precisam ser armazenados pela empresa por possíveis futuros motivos de consulta.
 
 Testes:
   - Teste de concorrência: demonstrando que múltiplos funcionários podem podem enviar/acessar arquivos ao mesmo tempo, sem comportamentos estranhos.
   - Demonstração de funcionalidades: conseguir enviar/acessar arquivos sem erros, mostrar o impedimento de acesso ao servidor com base no horário.
 
-# Entrega 1
+# Procedimentos
 ### Requisitos
-Java JDK >= 7
+Java JDK == 8
 ```
-sudo apt-get install default-jre
-sudo apt-get install default-jdk
+sudo apt install openjdk-8-jdk
 ```
-Apache Ant >= 1.8
+Apache Maven >= 3.0
 ```
-sudo apt-get install ant
+sudo apt install maven
 ```
 
 ### Instalando
@@ -40,33 +39,20 @@ Compile usando o ant
 
   - Servidor
 ```
-cd Servidor && ant jar && cd ..
+cd Servidor && mvn install && cd ..
 ```
   - Cliente
 ```
-cd Cliente && ant jar && cd ..
-```
-  - Teste de concorrência
-```
-cd Teste && ant jar && cd ..
+cd Cliente && mvn install jar && cd ..
 ```
 
 ### Executando
   - Servidor
 
-Sem restrição de horário
 ```
-java -jar Servidor/dist/Servidor.jar
-```
-Com restrição de horário - pode ser acessado das 8h às 18h
-```
-java -jar Servidor/dist/Servidor.jar restricao
+java -jar Servidor/target/Servidor-1.0-jar-with-dependencies.jar
 ```
   - Cliente
 ```
-java -jar Cliente/dist/Cliente.jar
-```
-  - Teste de concorrência
-```
-java -jar Teste/dist/Teste.jar
+java -jar Cliente/target/Cliente-1.0-jar-with-dependencies.jar
 ```

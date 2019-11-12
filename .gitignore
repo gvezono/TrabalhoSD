@@ -2,9 +2,12 @@
 /Servidor/dist
 /Servidor/nbproject/private
 /Servidor/SERVIDOR
+/Servidor/target/
+/Servidor/nbactions.xml
+/Servidor/nb-configuration.xml
 /Cliente/build
 /Cliente/dist
 /Cliente/nbproject/private
-/Teste/nbproject/private/
-/Teste/build/
-/Teste/dist/
+/Cliente/target/
+/Cliente/nbactions.xml
+/Cliente/nb-configuration.xml

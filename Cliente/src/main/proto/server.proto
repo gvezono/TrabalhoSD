@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package servidor;
+
+option java_multiple_files = true;
+option java_package = "servidor";
+option java_outer_classname = "ServidorProto";
+option objc_class_prefix = "SV";
+
+
+service ServidorFunc {
+	rpc Enviar (EnviarRequest) returns (EnviarReply) {}
+
+	rpc Listar (ListarRequest) returns (ListarReply) {}
+
+	rpc Receber (ReceberRequest) returns (ReceberReply) {}
+}
+
+message EnviarRequest {
+	string data = 1;
+	int64 tamanho = 2;
+	string nome = 3;
+	bytes arquivo = 4;
+}
+
+message EnviarReply {
+	string data = 1;
+	string nome = 2;
+	string status = 3;
+}
+
+message ListarRequest {
+
+}
+
+message ListarReply {
+	string data = 1;
+	repeated string nome = 2;
+	string status = 3;
+}
+
+message ReceberRequest {
+	string data = 1;
+	string nome = 2;
+}
+
+message ReceberReply {
+	string data = 1;
+	string nome = 2;
+	bytes arquivo = 3;
+	string status = 4;
+}

@@ -1,30 +1,103 @@
 package cliente;
 
+import servidor.*;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.InvalidProtocolBufferException;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
+import io.grpc.StatusRuntimeException;
 import java.util.logging.Logger;
 import java.io.File;
-import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Locale;
 import java.util.Scanner;
 import java.util.TimeZone;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
 public class Cliente {
+
+    private static final Logger logger = Logger.getLogger(Cliente.class.getName());
+
+    private final ManagedChannel channel;
+    private final ServidorFuncGrpc.ServidorFuncBlockingStub blockingStub;
+
+    public Cliente(String host, int port) {
+        this(ManagedChannelBuilder.forAddress(host, port)
+                .usePlaintext()
+                .build());
+    }
+
+    Cliente(ManagedChannel channel) {
+        this.channel = channel;
+        blockingStub = ServidorFuncGrpc.newBlockingStub(channel);
+    }
+
+    public void shutdown() throws InterruptedException {
+        channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+    }
+
+    public String Enviar(String data, String nome, byte[] arquivo) throws InvalidProtocolBufferException {
+        EnviarRequest request = EnviarRequest.newBuilder()
+                .setData(data)
+                .setTamanho((long) arquivo.length)
+                .setNome(nome)
+                .setArquivo(ByteString.copyFrom(arquivo))
+                .build();
+        EnviarReply response;
+        try {
+            response = blockingStub.enviar(request);
+            return response.getStatus();
+        } catch (StatusRuntimeException e) {
+            return "RPC failed: " + e.getStatus();
+        }
+    }
+
+    public String[] Listar() {
+        ListarRequest request = ListarRequest.newBuilder().build();
+        ListarReply response;
+        try {
+            response = blockingStub.listar(request);
+        } catch (StatusRuntimeException e) {
+            logger.log(Level.WARNING, "RPC failed: {0}", e.getStatus());
+            return new String[]{""};
+        }
+        String[] res = new String[response.getNomeList().size()];
+        Iterator it = response.getNomeList().iterator();
+        int i = 0;
+        while (it.hasNext()) {
+            res[i] = (String) it.next();
+            i++;
+        }
+        return res;
+    }
+
+    public Object[] Receber(String data, String nome) {
+        ReceberRequest request = ReceberRequest.newBuilder()
+                .setData(data)
+                .setNome(nome)
+                .build();
+        ReceberReply response;
+        try {
+            response = blockingStub.receber(request);
+        } catch (StatusRuntimeException e) {
+            return new Object[]{"", "RPC failed: " + e.getStatus()};
+        }
+        return new Object[]{response.getArquivo().toByteArray(), response.getStatus()};
+    }
 
     public static void main(String[] args) {
         try {
             Scanner sc = new Scanner(System.in);
             System.out.println("Digite o IP do servidor:");
             String ip = sc.nextLine().trim();
-            int porta = 5566;
-            Socket socket = new Socket(ip, porta);
-            Requisicao requisicao;
+            int porta = 50051;
+            Cliente c = new Cliente(ip, porta);
             String file;
             SimpleDateFormat formatador = new SimpleDateFormat("E, dd MMM yyyy hh:mm:ss", Locale.ENGLISH);
             formatador.setTimeZone(TimeZone.getTimeZone("GMT-3"));
@@ -34,7 +107,8 @@ public class Cliente {
             System.out.println("Digite o caminho completo de saída dos arquivos:");
             String saida = sc.nextLine();
             saida += saida.trim().endsWith(File.separator) ? "" : File.separator;
-            Resposta resposta;
+            String status;
+
             Path dircli = Paths.get(saida);
             while (!Files.exists(dircli) || !Files.isDirectory(dircli)) {
                 System.out.println("Pasta inexistente!");
@@ -50,44 +124,38 @@ public class Cliente {
                     case "Enviar":
                         System.out.println("Digite o caminho completo do arquivo com o nome do arquivo:");
                         file = sc.nextLine().trim();
-                        requisicao = new Requisicao();
                         dataFormatada = formatador.format(new Date()) + " GMT-3";
-                        requisicao.setCabecalho("Date", dataFormatada);
-                        requisicao.setCabecalho("Acao", "Enviar");
                         arquivo = new File(file);
-                        requisicao.setConteudoRequisicao(Files.readAllBytes(arquivo.toPath()));
-                        requisicao.setCabecalho("Content-Length", "" + requisicao.getTamanhoRequisicao());
-                        requisicao.setCabecalho("Arquivo", arquivo.getName());
-                        requisicao.setSaida(socket.getOutputStream());
-                        requisicao.enviar();
-                        resposta = Resposta.lerEntrada(socket.getInputStream());
-                        String status = (String) resposta.getCabecalho().get("Status").get(0);
-                        if (status.equals("OK")) {
-                            System.out.println("Arquivo enviado com sucesso");
-                            System.out.println("Pressione enter para continuar ...");
-                            sc.nextLine();
+                        if (arquivo.exists()) {
+                            try {
+                                status = c.Enviar(dataFormatada, arquivo.getName(), Files.readAllBytes(arquivo.toPath()));
+                            } catch (InvalidProtocolBufferException e) {
+                                status = "Error: " + e.toString();
+                            }
+                            if (status.equals("OK")) {
+                                System.out.println("Arquivo enviado com sucesso");
+                                System.out.println("Pressione enter para continuar ...");
+                                sc.nextLine();
+                            } else {
+                                logger.log(Level.WARNING, status);
+                                System.out.println("Arquivo não pode ser enviado");
+                                System.out.println("Pressione enter para continuar ...");
+                                sc.nextLine();
+                            }
                         } else {
-                            System.out.println("Arquivo não pode ser enviado");
+                            System.out.println("Arquivo inexistente");
                             System.out.println("Pressione enter para continuar ...");
                             sc.nextLine();
                         }
                         break;
+
                     case "Listar":
-                        requisicao = new Requisicao();
-                        dataFormatada = formatador.format(new Date()) + " GMT-3";
-                        requisicao.setCabecalho("Date", dataFormatada);
-                        requisicao.setCabecalho("Acao", "Listar");
-                        requisicao.setCabecalho("Content-Length", "0");
-                        requisicao.setCabecalho("Arquivo", "");
-                        requisicao.setSaida(socket.getOutputStream());
-                        requisicao.enviar();
-                        resposta = Resposta.lerEntrada(socket.getInputStream());
-                        List<String> lista = resposta.getCabecalho().get("Lista");
+                        String[] lista = c.Listar();
                         System.out.println("Arquivos no servidor:");
-                        int i = 1;
-                        if (lista.size() <= 1 && lista.get(0).equals("")) {
+                        if (lista.length < 1 || lista[0].equals("")) {
                             System.out.println("Nenhum arquivo encontrado!");
                         } else {
+                            int i = 1;
                             for (String nome : lista) {
                                 System.out.println((i++) + " " + nome.trim());
                             }
@@ -98,39 +166,22 @@ public class Cliente {
                     case "Receber":
                         System.out.println("Digite o nome do arquivo:");
                         file = sc.nextLine().trim();
-                        requisicao = new Requisicao();
                         dataFormatada = formatador.format(new Date()) + " GMT-3";
-                        requisicao.setCabecalho("Date", dataFormatada);
-                        requisicao.setCabecalho("Acao", "Receber");
-                        requisicao.setCabecalho("Content-Length", "0");
-                        requisicao.setCabecalho("Arquivo", file);
-                        requisicao.setSaida(socket.getOutputStream());
-                        requisicao.enviar();
-                        resposta = Resposta.lerEntrada(socket.getInputStream());
-                        if (resposta.getCabecalho().get("Status").get(0).equals("OK")) {
+                        Object[] res = c.Receber(dataFormatada, file);
+                        status = (String) res[1];
+                        if (status.equals("OK")) {
                             arquivo = new File(saida + file);
-                            Files.write(arquivo.toPath(), resposta.getConteudoResposta());
+                            Files.write(arquivo.toPath(), (byte[]) res[0]);
                             System.out.println("Arquivo recebido");
                             System.out.println("Pressione enter para continuar ...");
                             sc.nextLine();
                         } else {
-                            Iterator it = resposta.getCabecalho().get("Status").iterator();
-                            while (it.hasNext()) {
-                                System.out.println((String) it.next());
-                            }
+                            logger.log(Level.WARNING, (String) res[1]);
                             System.out.println("Pressione enter para continuar ...");
                             sc.nextLine();
                         }
                         break;
                     case "Sair":
-                        requisicao = new Requisicao();
-                        dataFormatada = formatador.format(new Date()) + " GMT-3";
-                        requisicao.setCabecalho("Date", dataFormatada);
-                        requisicao.setCabecalho("Acao", "Sair");
-                        requisicao.setCabecalho("Content-Length", "0");
-                        requisicao.setSaida(socket.getOutputStream());
-                        requisicao.enviar();
-                        socket.close();
                         conectado = false;
                         break;
                     case "Alterar":
@@ -151,7 +202,8 @@ public class Cliente {
                 }
             }
         } catch (Exception ex) {
-            Logger.getLogger(Cliente.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(Cliente.class
+                    .getName()).log(Level.SEVERE, null, ex);
         }
     }
 
