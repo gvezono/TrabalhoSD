@@ -10,6 +10,8 @@ Victor Melazo   11611BCC018
 
 Carolina Alves  11411BSI234
 
+Matheus Araújo 11521BSI249 
+
 # Descrição
 Formalização do projeto: o mesmo consiste em criar um servidor local de empresa com departamento de licitações, já que, nessa área geram muitos documentos. Sendo assim, é interessante ter um servidor para armazenar tantos itens que provavelmente não serão mais acessados, porém, precisam ser armazenados pela empresa por possíveis futuros motivos de consulta.
 
@@ -35,7 +37,7 @@ git clone https://github.com/gvezono/TrabalhoSD.git
 cd TrabalhoSD
 ```
 
-Compile usando o ant
+Compile usando o mvn
 
   - Servidor
 ```
