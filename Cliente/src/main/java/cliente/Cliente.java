@@ -8,6 +8,9 @@ import io.grpc.ManagedChannelBuilder;
 import io.grpc.StatusRuntimeException;
 import java.util.logging.Logger;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -15,6 +18,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.Locale;
+import java.util.Properties;
 import java.util.Scanner;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
@@ -109,30 +113,47 @@ public class Cliente {
 
     public static void main(String[] args) {
         try {
+            Properties prop = new Properties();
+            Cliente c;
+            int porta;
+            String host, saida;
             Scanner sc = new Scanner(System.in);
-            System.out.println("Digite o IP do servidor:");
-            String ip = sc.nextLine().trim();
-            int porta = 50051;
-            Cliente c = new Cliente(ip, porta);
-            String file;
-            SimpleDateFormat formatador = new SimpleDateFormat("E, dd MMM yyyy hh:mm:ss", Locale.ENGLISH);
-            formatador.setTimeZone(TimeZone.getTimeZone("GMT-3"));
-            String dataFormatada;
-            File arquivo;
-            boolean conectado = true;
-            System.out.println("Digite o caminho completo de saída dos arquivos:");
-            String saida = sc.nextLine();
+            InputStream is = Cliente.class.getResourceAsStream("/app.properties");
+            try {
+                prop.load(is);
+                host = prop.getProperty("server.host");
+                porta = Integer.parseInt(prop.getProperty("server.porta"));
+                saida = prop.getProperty("saida");
+            } catch (IOException | NumberFormatException | NullPointerException e) {
+                System.out.println(System.getProperty("java.class.path"));
+                System.out.println("Arquivo de configuração não pôde ser lido!");
+                System.out.println("Digite o IP do servidor:");
+                host = sc.nextLine().trim();
+                System.out.println("Digite a porta do servidor:");
+                porta = sc.nextInt();
+                System.out.println("Digite o caminho completo de saída dos arquivos:");
+                saida = sc.nextLine();
+            }
+            c = new Cliente(host, porta);
             saida += saida.trim().endsWith(File.separator) ? "" : File.separator;
-            String status;
-
+            
             Path dircli = Paths.get(saida);
             while (!Files.exists(dircli) || !Files.isDirectory(dircli)) {
-                System.out.println("Pasta inexistente!");
+                System.out.println("Pasta de saída inexistente!");
                 System.out.println("Digite o caminho completo de saída dos arquivos:");
                 saida = sc.nextLine();
                 saida += saida.trim().endsWith(File.separator) ? "" : File.separator;
                 dircli = Paths.get(saida);
             }
+            
+            SimpleDateFormat formatador = new SimpleDateFormat("E, dd MMM yyyy hh:mm:ss", Locale.ENGLISH);
+            formatador.setTimeZone(TimeZone.getTimeZone("GMT-3"));
+            String dataFormatada;
+            String file;
+            File arquivo;
+            boolean conectado = true;
+            String status;
+
             while (conectado) {
                 printInterface();
                 String acao = sc.nextLine();

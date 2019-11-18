@@ -7,6 +7,7 @@ import io.grpc.stub.StreamObserver;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -14,6 +15,7 @@ import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Locale;
+import java.util.Properties;
 import java.util.TimeZone;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -22,23 +24,35 @@ public class Servidor {
 
     private static final Logger logger = Logger.getLogger(Servidor.class.getName());
 
-    private final boolean restricao = false;
+    //private final boolean restricao = false;
 
     private Server server;
 
     private void start() throws IOException {
-        Path dirsv = Paths.get("SERVIDOR");
+        InputStream is = Servidor.class.getResourceAsStream("/app.properties");
+        Properties prop = new Properties();
+        int porta;
+        String saida;
+        try {
+            prop.load(is);
+            porta = Integer.parseInt(prop.getProperty("porta"));
+            saida = prop.getProperty("saida");
+        } catch (IOException | NumberFormatException e) {
+            logger.log(Level.INFO, e.toString());
+            porta = 50051;
+            saida = "SERVIDOR";
+        }
+        Path dirsv = Paths.get(saida);
         if (Files.notExists(dirsv)) {
             File file = new File(dirsv.toUri());
             file.mkdir();
         }
-        int port = 50051;
-        server = ServerBuilder.forPort(port)
-                .addService(new ServerFuncIm())
+        server = ServerBuilder.forPort(porta)
+                .addService(new ServerFuncImpl())
                 .maxInboundMessageSize(Integer.MAX_VALUE)
                 .build()
                 .start();
-        logger.log(Level.INFO, "Server started, listening on {0}", port);
+        logger.log(Level.INFO, "Server started, listening on {0}", porta);
         Runtime.getRuntime().addShutdownHook(new Thread() {
             @Override
             public void run() {
@@ -68,14 +82,14 @@ public class Servidor {
         server.blockUntilShutdown();
     }
 
-    static class ServerFuncIm extends ServidorFuncGrpc.ServidorFuncImplBase {
+    static class ServerFuncImpl extends ServidorFuncGrpc.ServidorFuncImplBase {
 
         SimpleDateFormat formatador = new SimpleDateFormat("E, dd MMM yyyy hh:mm:ss", Locale.ENGLISH);
         String dataFormatada;
         String file;
         File arquivo;
 
-        private ServerFuncIm() {
+        private ServerFuncImpl() {
             formatador.setTimeZone(TimeZone.getTimeZone("GMT-3"));
         }
 

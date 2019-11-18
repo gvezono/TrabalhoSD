@@ -15,6 +15,31 @@
         </extensions>
         <plugins>
             <plugin>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>copy-resources</id>
+                        <phase>install</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <encoding>UTF-8</encoding>
+                            <outputDirectory>${basedir}/target/conf</outputDirectory>
+                            <resources>          
+                                <resource>
+                                    <directory>src/main/resources</directory>
+                                    <includes>
+                                        <include>**/*.properties</include>
+                                    </includes>
+                                </resource>
+                            </resources>              
+                        </configuration>            
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.8.0</version>
@@ -67,10 +92,18 @@
                     <descriptorRefs>
                         <descriptorRef>jar-with-dependencies</descriptorRef>
                     </descriptorRefs>
+                    <excludes>
+                        <exclude>**/*.properties</exclude>
+                    </excludes>
                     <archive>
+                        <addMavenDescriptor>false</addMavenDescriptor>
                         <manifest>
+                            <addClasspath>true</addClasspath>
                             <mainClass>cliente.Cliente</mainClass>
                         </manifest>
+                        <manifestEntries>
+                            <Class-Path>conf/</Class-Path>
+                        </manifestEntries>
                     </archive>
                 </configuration>
                 <executions>
@@ -88,6 +121,9 @@
                 <artifactId>maven-jar-plugin</artifactId>
                 <version>3.2.0</version>
                 <configuration>
+                    <excludes>
+                        <exclude>**/*.properties</exclude>
+                    </excludes>
                     <archive>
                         <manifest>
                             <mainClass>cliente.Cliente</mainClass>
