@@ -14,6 +14,12 @@ service ServidorFunc {
 	rpc Listar (ListarRequest) returns (ListarReply) {}
 
 	rpc Receber (ReceberRequest) returns (ReceberReply) {}
+
+        rpc AdicionarServer (AddSvRequest) returns (AddSvReply) {}
+
+        rpc RemoverServer (RmSvRequest) returns (RmSvReply) {}
+
+        rpc Transferir (stream TransferirRequest) returns (TransferirReply) {}
 }
 
 message EnviarRequest {
@@ -50,4 +56,35 @@ message ReceberReply {
         int64 tamanho = 3;
 	repeated bytes arquivo = 4;
 	string status = 5;
+}
+
+message AddSvRequest {
+    string ip = 1;
+    string porta = 2;
+    string hash = 3;
+}
+
+message AddSvReply {
+    string status = 1;
+    int64 numeroArquivos = 2;
+}
+
+message RmSvRequest {
+    int64 numeroArquivos = 1;
+}
+
+message RmSvReply {
+    string status = 1;
+}
+
+message TransferirRequest {
+    string nome = 1;
+    int64 tamanho = 2;
+    repeated bytes arquivo = 3;
+    int64 numeroArquivos = 4;
+}
+
+message TransferirReply {
+    string status = 1;
+    int64 arquivosRecebidos = 2;
 }
