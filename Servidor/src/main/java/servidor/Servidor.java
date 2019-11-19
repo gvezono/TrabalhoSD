@@ -66,28 +66,19 @@ public class Servidor {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             digest.update((this.ip + this.porta).getBytes());
             p = new BigInteger(digest.digest());
-            Enumeration e = prop.propertyNames();
             boolean skipnext = false;
-            String newip, prefix;
+            String newip;
             int newport;
             byte[] hash;
-            while (e.hasMoreElements()) {
-                String nome = (String) e.nextElement();
-                if (nome.startsWith("servidor")) {
-                    prefix = nome.split(".")[0];
-                    if (skipnext) {
-                        skipnext = false;
-                    } else {
-                        newip = prop.getProperty(prefix + ".ip");
-                        newport = Integer.parseInt(prop.getProperty(prefix + ".porta"));
-                        digest = MessageDigest.getInstance("SHA-256");
-                        digest.update((newip + newport).getBytes());
+            if (prop.containsKey("servidor.ip") && prop.containsKey("servidor.porta")) {
+                newip = prop.getProperty("servidor.ip");
+                newport = Integer.parseInt(prop.getProperty("servidor.porta"));
+                digest = MessageDigest.getInstance("SHA-256");
+                digest.update((newip + newport).getBytes());
 
-                        hash = digest.digest();
-                        this.map.put(new BigInteger(hash), new ServerCli(newip, newport));
-                        skipnext = true;
-                    }
-                }
+                hash = digest.digest();
+                this.map.put(new BigInteger(hash), new ServerCli(newip, newport));
+                skipnext = true;
             }
         } catch (IOException | NumberFormatException e) {
             logger.log(Level.INFO, e.toString());
@@ -178,10 +169,10 @@ public class Servidor {
         Collections.sort(sortedKeys);
         Iterator it = sortedKeys.iterator();
         BigInteger aux = null;
-        while(it.hasNext()){
+        while (it.hasNext()) {
             aux = (BigInteger) it.next();
         }
-        if(reqHash.compareTo(aux) == 1){
+        if (reqHash.compareTo(aux) == 1) {
             return map.get(aux);
         }
         aux = ft[0];
