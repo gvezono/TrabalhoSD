@@ -20,9 +20,9 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -36,21 +36,23 @@ public class Servidor {
 
     private static final Logger logger = Logger.getLogger(Servidor.class.getName());
 
-    private HashMap<BigInteger, ServerCli> map = new HashMap<BigInteger, ServerCli>();
-    private BigInteger[] ft;
+    private static final HashMap<BigInteger, ServerCli> map = new HashMap<BigInteger, ServerCli>();
+    private static BigInteger[] ft, ftReal;
     //BigInteger = hash convertido para int, servercli = conexao com o servidor
 
-    private int porta;
-    private String ip;
+    private static int porta;
+    private static String ip;
 
-    private String saida;
+    private static ServerCli c, prevCli;
+
+    private static String saida;
 
     //private final boolean restricao = false;
     private Server server;
 
     //ft
-    private int m = 256; //sha256
-    private BigInteger p; //hash ip+porta
+    private static final int m = 256; //sha256
+    private static BigInteger p, prev; //hash ip+porta
 
     public Servidor() throws SocketException, UnknownHostException, NoSuchAlgorithmException {
         try (final DatagramSocket socket = new DatagramSocket()) {
@@ -66,26 +68,29 @@ public class Servidor {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             digest.update((this.ip + this.porta).getBytes());
             p = new BigInteger(digest.digest());
-            boolean skipnext = false;
             String newip;
             int newport;
-            byte[] hash;
             if (prop.containsKey("servidor.ip") && prop.containsKey("servidor.porta")) {
                 newip = prop.getProperty("servidor.ip");
                 newport = Integer.parseInt(prop.getProperty("servidor.porta"));
-                digest = MessageDigest.getInstance("SHA-256");
-                digest.update((newip + newport).getBytes());
 
-                hash = digest.digest();
-                this.map.put(new BigInteger(hash), new ServerCli(newip, newport));
-                skipnext = true;
+                Servidor.c = new ServerCli(newip, newport);
+                create();
+                AddSvReply reply = c.entrar(this.ip, this.porta, Servidor.p.toString());
+                if (!reply.getStatus().equals("OK")) {
+                    prev = p;
+                    prevCli = null;
+                }
+            } else {
+                prev = p;
+                prevCli = null;
             }
         } catch (IOException | NumberFormatException e) {
             logger.log(Level.INFO, e.toString());
             this.porta = 50051;
-            this.saida = "SERVIDOR";
+            Servidor.saida = "SERVIDOR";
         }
-        Path dirsv = Paths.get(this.saida);
+        Path dirsv = Paths.get(Servidor.saida);
         if (Files.notExists(dirsv)) {
             File file = new File(dirsv.toUri());
             file.mkdir();
@@ -94,7 +99,7 @@ public class Servidor {
 
     private void start() throws IOException {
         server = ServerBuilder.forPort(this.porta)
-                .addService(new ServerFuncImpl(this.saida))
+                .addService(new ServerFuncImpl())
                 .maxInboundMessageSize(Integer.MAX_VALUE)
                 .build()
                 .start();
@@ -123,23 +128,34 @@ public class Servidor {
         }
     }
 
-    private void create() {
+    private static void create() {
         List<BigInteger> sortedKeys = new ArrayList<>(map.keySet());
         Collections.sort(sortedKeys);
         ft = new BigInteger[m];
-        BigInteger suc, aux, real;
+        BigInteger suc, aux;
         int i;
         aux = new BigInteger("2");
         for (i = 0; i < m; i++) {
             suc = p.add(aux.pow(i)).mod(aux.pow(m));
             ft[i] = suc;
         }
-        i = 0;
+        ftReal = ft;
+        update();
+    }
+
+    private static void update() {
+        if (map.isEmpty()) {
+            ft[0] = Servidor.p;
+            return;
+        }
+        int i = 0;
+        BigInteger aux = null, real;
+        List<BigInteger> sortedKeys = new ArrayList<>(map.keySet());
         Iterator it = sortedKeys.iterator();
         while (it.hasNext()) {
             aux = (BigInteger) it.next();
             while (true) {
-                if (ft[i].compareTo(aux) <= 0) {
+                if (ftReal[i].compareTo(aux) <= 0) {
                     ft[i] = aux;
                     i++;
                 } else {
@@ -147,13 +163,13 @@ public class Servidor {
                 }
             }
         }
-        if (i < m) {
+        if ((i < m) && (aux != null)) {
             it = sortedKeys.iterator();
             while (it.hasNext()) {
                 real = (BigInteger) it.next();
                 aux = real.add(aux.pow(255));
                 while (true) {
-                    if (ft[i].compareTo(aux) <= 0) {
+                    if (ftReal[i].compareTo(aux) <= 0) {
                         ft[i] = real;
                         i++;
                     } else {
@@ -164,7 +180,7 @@ public class Servidor {
         }
     }
 
-    private ServerCli getOwner(BigInteger reqHash) {
+    private static ServerCli getOwner(BigInteger reqHash) {
         List<BigInteger> sortedKeys = new ArrayList<>(map.keySet());
         Collections.sort(sortedKeys);
         Iterator it = sortedKeys.iterator();
@@ -188,6 +204,19 @@ public class Servidor {
         }
     }
 
+    public static void purgeUnused() {
+        List<BigInteger> keys = new ArrayList<>(map.keySet());
+        Iterator it = keys.iterator();
+        BigInteger aux;
+        while (it.hasNext()) {
+            aux = (BigInteger) it.next();
+            int ret = Arrays.binarySearch(ft, aux);
+            if (ret < 0) {
+                map.remove(aux);
+            }
+        }
+    }
+
     public static void main(String[] args) throws IOException, InterruptedException, NoSuchAlgorithmException {
         final Servidor server = new Servidor();
         server.start();
@@ -199,18 +228,19 @@ public class Servidor {
         private final SimpleDateFormat formatador = new SimpleDateFormat("E, dd MMM yyyy hh:mm:ss", Locale.ENGLISH);
         private String dataFormatada;
         private String file;
-        private final String saida;
         private File arquivo;
 
-        private ServerFuncImpl(String saida) {
+        private static final List<BigInteger> transientids = new ArrayList<BigInteger>();
+
+        private ServerFuncImpl() {
             formatador.setTimeZone(TimeZone.getTimeZone("GMT-3"));
-            this.saida = saida;
+            Servidor.create();
         }
 
         @Override
         public void enviar(EnviarRequest req, StreamObserver<EnviarReply> responseObserver) {
             file = req.getNome();
-            arquivo = new File(this.saida + File.separator + file);
+            arquivo = new File(Servidor.saida + File.separator + file);
             int count = req.getArquivoCount();
             long control = 0;
             long size = req.getTamanho();
@@ -238,7 +268,7 @@ public class Servidor {
 
         @Override
         public void listar(ListarRequest req, StreamObserver<ListarReply> responseObserver) {
-            arquivo = new File(this.saida + File.separator);
+            arquivo = new File(Servidor.saida + File.separator);
             String[] lista = arquivo.list();
             String erro = "";
             if (lista == null) {
@@ -268,7 +298,7 @@ public class Servidor {
             String erro = "";
             ReceberReply.Builder reply = ReceberReply.newBuilder();
             try {
-                arquivo = new File(this.saida + File.separator + file);
+                arquivo = new File(Servidor.saida + File.separator + file);
                 byte[] arq = Files.readAllBytes(arquivo.toPath());
                 long control = 0;
                 long size = arq.length;
@@ -293,5 +323,87 @@ public class Servidor {
             responseObserver.onNext(reply.build());
             responseObserver.onCompleted();
         }
+
+        @Override
+        public void adicionarServer(AddSvRequest req, StreamObserver<AddSvReply> responseObserver) {
+            BigInteger hash = new BigInteger(req.getHash());
+            String ip = req.getIp();
+            int porta = req.getPorta();
+
+            ServerCli newSv = new ServerCli(ip, porta);
+            //informa ao novo sv que este existe;
+            newSv.ping(Servidor.ip, Servidor.porta, Servidor.p.toString());
+
+            boolean control = req.getControl();
+            int ret = Arrays.binarySearch(ftReal, hash);
+            if (ret > 0) {
+                Servidor.map.put(hash, newSv);
+                Servidor.update();
+            }
+            if (control) {
+                if (!Servidor.ft[0].equals(Servidor.p)) {
+                    transientids.add(hash);
+
+                    AddSvRequest.Builder build = req.toBuilder();
+                    build = build.setControl(false);
+                    responseObserver.onNext(Servidor.map.get(Servidor.ft[0]).repassar(build.build()));
+                } else {
+                    //insere primeiro
+                    Servidor.prevCli = newSv;
+                    Servidor.prev = hash;
+                    Servidor.prevCli.enviarArquivos(Servidor.p, Servidor.prev);
+                    Servidor.map.put(Servidor.prev, Servidor.prevCli);
+                    Servidor.update();
+                    AddSvReply reply = AddSvReply.newBuilder()
+                            .setStatus("Ok")
+                            .build();
+                    responseObserver.onNext(reply);
+                    Servidor.prevCli.enviarArquivos(Servidor.p, Servidor.prev);
+                }
+            } else {
+                if (transientids.contains(hash)) {
+                    transientids.remove(hash);
+                    AddSvReply reply = AddSvReply.newBuilder()
+                            .setStatus("Ok")
+                            .build();
+                    responseObserver.onNext(reply);
+                } else {
+                    responseObserver.onNext(Servidor.map.get(Servidor.ft[0]).repassar(req));
+                }
+            }
+            if (hash.compareTo(Servidor.prev) > 0 && !Servidor.ft[0].equals(Servidor.p)) {
+                //files owner
+                Servidor.prevCli = newSv;
+                BigInteger oldPrev = Servidor.prev;
+                Servidor.prev = hash;
+                Servidor.prevCli.enviarArquivos(oldPrev, Servidor.prev);
+            }
+            responseObserver.onCompleted();
+        }
+
+        @Override
+        public void ping(PingRequest req, StreamObserver<PingReply> responseObserver) {
+            String ip = req.getIp();
+            int porta = req.getPorta();
+            BigInteger hash = new BigInteger(req.getHash());
+            Servidor.map.put(hash, new ServerCli(ip, porta));
+            Servidor.update();
+            Servidor.purgeUnused();
+            responseObserver.onNext(PingReply.newBuilder().build());
+            responseObserver.onCompleted();
+        }
+
+        /*@Override
+        public StreamObserver<TransferirRequest> transferir(StreamObserver<TransferirReply> responseObserver) {
+            return null;
+        }*/
+        
+        /*
+        @Override
+        public void rTransferir(RTransferirRequest req, StreamObserver<RTransferirReply> responseObserver){
+            
+        }*/
+
+        //RemoverServer (RmSvRequest) returns (RmSvReply)
     }
 }

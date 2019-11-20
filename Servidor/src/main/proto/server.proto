@@ -20,6 +20,10 @@ service ServidorFunc {
         rpc RemoverServer (RmSvRequest) returns (RmSvReply) {}
 
         rpc Transferir (stream TransferirRequest) returns (TransferirReply) {}
+
+        rpc RTransferir (RTransferirRequest) returns (stream RTransferirReply) {}
+
+        rpc Ping (PingRequest) returns (PingReply) {}
 }
 
 message EnviarRequest {
@@ -59,32 +63,53 @@ message ReceberReply {
 }
 
 message AddSvRequest {
-    string ip = 1;
-    string porta = 2;
-    string hash = 3;
+        string ip = 1;
+        int32 porta = 2;
+        string hash = 3;
+        bool control = 4;
 }
 
 message AddSvReply {
-    string status = 1;
-    int64 numeroArquivos = 2;
+        string status = 1;
 }
 
 message RmSvRequest {
-    int64 numeroArquivos = 1;
+        int64 numeroArquivos = 1;
 }
 
 message RmSvReply {
-    string status = 1;
+        string status = 1;
 }
 
 message TransferirRequest {
-    string nome = 1;
-    int64 tamanho = 2;
-    repeated bytes arquivo = 3;
-    int64 numeroArquivos = 4;
+        string nome = 1;
+        int64 tamanho = 2;
+        repeated bytes arquivo = 3;
+        int64 numeroArquivos = 4;
 }
 
 message TransferirReply {
-    string status = 1;
-    int64 arquivosRecebidos = 2;
+        string status = 1;
+        int64 arquivosRecebidos = 2;
+}
+
+message RTransferirRequest {
+        int64 numeroArquivos = 1;
+}
+
+message RTransferirReply {
+        string nome = 1;
+        int64 tamanho = 2;
+        repeated bytes arquivo = 3;
+        int64 numeroArquivos = 4;
+}
+
+message PingRequest {
+        string ip = 1;
+        int32 porta = 2;
+        string hash = 3;
+}
+
+message PingReply {
+
 }
