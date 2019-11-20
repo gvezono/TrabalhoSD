@@ -46,28 +46,33 @@ public class Servidor {
     private static ServerCli c, prevCli;
 
     private static String saida;
+    
+    private static String usedHash;
 
     //private final boolean restricao = false;
     private Server server;
 
     //ft
-    private static final int m = 256; //sha256
+    private static int m; //128 (SHA-256)
     private static BigInteger p, prev; //hash ip+porta
 
     public Servidor() throws SocketException, UnknownHostException, NoSuchAlgorithmException {
         try (final DatagramSocket socket = new DatagramSocket()) {
             socket.connect(InetAddress.getByName("8.8.8.8"), 10002);
-            this.ip = socket.getLocalAddress().getHostAddress();
+            Servidor.ip = socket.getLocalAddress().getHostAddress();
         }
         InputStream is = Servidor.class.getResourceAsStream("/app.properties");
         Properties prop = new Properties();
         try {
             prop.load(is);
-            this.porta = Integer.parseInt(prop.getProperty("porta"));
+            Servidor.porta = Integer.parseInt(prop.getProperty("porta"));
             saida = prop.getProperty("saida");
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            digest.update((this.ip + this.porta).getBytes());
-            p = new BigInteger(digest.digest());
+            usedHash = prop.getProperty("hash");
+            MessageDigest digest = MessageDigest.getInstance(usedHash);
+            digest.update((Servidor.ip + Servidor.porta).getBytes());
+            byte[] hash = digest.digest();
+            p = new BigInteger(hash);
+            m = (hash.length * 4);
             String newip;
             int newport;
             if (prop.containsKey("servidor.ip") && prop.containsKey("servidor.porta")) {
@@ -76,7 +81,7 @@ public class Servidor {
 
                 Servidor.c = new ServerCli(newip, newport);
                 create();
-                AddSvReply reply = c.entrar(this.ip, this.porta, Servidor.p.toString());
+                AddSvReply reply = c.entrar(Servidor.ip, Servidor.porta, Servidor.p.toString());
                 if (!reply.getStatus().equals("OK")) {
                     prev = p;
                     prevCli = null;
@@ -87,8 +92,16 @@ public class Servidor {
             }
         } catch (IOException | NumberFormatException e) {
             logger.log(Level.INFO, e.toString());
-            this.porta = 50051;
+            Servidor.porta = 50051;
             Servidor.saida = "SERVIDOR";
+            usedHash = "SHA-256";
+            MessageDigest digest = MessageDigest.getInstance(usedHash);
+            digest.update((Servidor.ip + Servidor.porta).getBytes());
+            byte[] hash = digest.digest();
+            p = new BigInteger(hash);
+            m = (hash.length * 4);
+            prev = p;
+            prevCli = null;
         }
         Path dirsv = Paths.get(Servidor.saida);
         if (Files.notExists(dirsv)) {
@@ -98,13 +111,13 @@ public class Servidor {
     }
 
     private void start() throws IOException {
-        server = ServerBuilder.forPort(this.porta)
+        server = ServerBuilder.forPort(Servidor.porta)
                 .addService(new ServerFuncImpl())
                 .maxInboundMessageSize(Integer.MAX_VALUE)
                 .build()
                 .start();
 
-        logger.log(Level.INFO, "Server started, listening on {0}", porta);
+        logger.log(Level.INFO, "Server started, listening on {0}", Servidor.porta);
         Runtime.getRuntime().addShutdownHook(new Thread() {
             @Override
             public void run() {
@@ -132,14 +145,14 @@ public class Servidor {
         List<BigInteger> sortedKeys = new ArrayList<>(map.keySet());
         Collections.sort(sortedKeys);
         ft = new BigInteger[m];
+        ftReal = new BigInteger[m];
         BigInteger suc, aux;
         int i;
         aux = new BigInteger("2");
         for (i = 0; i < m; i++) {
             suc = p.add(aux.pow(i)).mod(aux.pow(m));
-            ft[i] = suc;
+            ftReal[i] = suc;
         }
-        ftReal = ft;
         update();
     }
 
@@ -167,7 +180,7 @@ public class Servidor {
             it = sortedKeys.iterator();
             while (it.hasNext()) {
                 real = (BigInteger) it.next();
-                aux = real.add(aux.pow(255));
+                aux = real.add(aux.pow((m-1)));
                 while (true) {
                     if (ftReal[i].compareTo(aux) <= 0) {
                         ft[i] = real;
@@ -397,13 +410,11 @@ public class Servidor {
         public StreamObserver<TransferirRequest> transferir(StreamObserver<TransferirReply> responseObserver) {
             return null;
         }*/
-        
-        /*
+ /*
         @Override
         public void rTransferir(RTransferirRequest req, StreamObserver<RTransferirReply> responseObserver){
             
         }*/
-
         //RemoverServer (RmSvRequest) returns (RmSvReply)
     }
 }
