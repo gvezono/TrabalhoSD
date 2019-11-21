@@ -46,7 +46,7 @@ public class Servidor {
     private static ServerCli c, prevCli;
 
     private static String saida;
-    
+
     private static String usedHash;
 
     //private final boolean restricao = false;
@@ -85,6 +85,18 @@ public class Servidor {
                 if (!reply.getStatus().equals("OK")) {
                     prev = p;
                     prevCli = null;
+                } else {
+                    List<String> hosts = reply.getHostsList();
+                    for (String host : hosts) {
+                        String hip = host.split(":")[0];
+                        int hporta = Integer.parseInt(host.split(":")[1]);
+                        MessageDigest digestHost = MessageDigest.getInstance(usedHash);
+                        digestHost.update((hip + hporta).getBytes());
+                        BigInteger hashHost = new BigInteger(digest.digest());
+                        Servidor.map.put(hashHost, new ServerCli(ip, porta));
+                        Servidor.update();
+                        Servidor.purgeUnused();
+                    }
                 }
             } else {
                 prev = p;
@@ -180,7 +192,7 @@ public class Servidor {
             it = sortedKeys.iterator();
             while (it.hasNext()) {
                 real = (BigInteger) it.next();
-                aux = real.add(aux.pow((m-1)));
+                aux = real.add(aux.pow((m - 1)));
                 while (true) {
                     if (ftReal[i].compareTo(aux) <= 0) {
                         ft[i] = real;
@@ -253,30 +265,62 @@ public class Servidor {
         @Override
         public void enviar(EnviarRequest req, StreamObserver<EnviarReply> responseObserver) {
             file = req.getNome();
-            arquivo = new File(Servidor.saida + File.separator + file);
-            int count = req.getArquivoCount();
-            long control = 0;
-            long size = req.getTamanho();
-            byte[] arq = new byte[(int) size];
-            for (int i = 0; i < count; i++) {
-                byte[] aux = req.getArquivo(i).toByteArray();
-                System.arraycopy(aux, 0, arq, (int) control, aux.length);
-                control += aux.length;
-            }
+            MessageDigest digest;
             try {
-                Files.write(arquivo.toPath(), arq);
-            } catch (IOException ex) {
-                Logger.getLogger(Servidor.class.getName()).log(Level.SEVERE, null, ex);
-            }
+                digest = MessageDigest.getInstance(Servidor.usedHash);
+                digest.update((Servidor.ip + Servidor.porta).getBytes());
+                BigInteger fileHash = new BigInteger(digest.digest());
+                if (((fileHash.compareTo(Servidor.prev) > 1) && (fileHash.compareTo(Servidor.p) < 1)) || (Servidor.prev.compareTo(Servidor.p) == 0)) {
+                    arquivo = new File(Servidor.saida + File.separator + file);
+                    int count = req.getArquivoCount();
+                    long control = 0;
+                    long size = req.getTamanho();
+                    byte[] arq = new byte[(int) size];
+                    for (int i = 0; i < count; i++) {
+                        byte[] aux = req.getArquivo(i).toByteArray();
+                        System.arraycopy(aux, 0, arq, (int) control, aux.length);
+                        control += aux.length;
+                    }
+                    try {
+                        Files.write(arquivo.toPath(), arq);
+                    } catch (IOException ex) {
+                        Logger.getLogger(Servidor.class.getName()).log(Level.SEVERE, null, ex);
+                    }
 
-            dataFormatada = formatador.format(new Date()) + " GMT-3";
-            EnviarReply reply = EnviarReply.newBuilder()
-                    .setData(dataFormatada)
-                    .setNome(req.getNome())
-                    .setStatus("OK")
-                    .build();
-            responseObserver.onNext(reply);
-            responseObserver.onCompleted();
+                    dataFormatada = formatador.format(new Date()) + " GMT-3";
+                    EnviarReply reply = EnviarReply.newBuilder()
+                            .setData(dataFormatada)
+                            .setNome(req.getNome())
+                            .setStatus("OK")
+                            .build();
+                    responseObserver.onNext(reply);
+                    responseObserver.onCompleted();
+                } else {
+                    ServerCli dest = Servidor.getOwner(fileHash);
+                    if (dest != null) {
+                        EnviarReply reply = dest.enviar(req);
+                        responseObserver.onNext(reply);
+                        responseObserver.onCompleted();
+                    } else {
+                        EnviarReply reply = EnviarReply.newBuilder()
+                                .setData(dataFormatada)
+                                .setNome(req.getNome())
+                                .setStatus("ERROR")
+                                .build();
+                        responseObserver.onNext(reply);
+                        responseObserver.onCompleted();
+                    }
+                }
+            } catch (NoSuchAlgorithmException ex) {
+                Logger.getLogger(Servidor.class.getName()).log(Level.SEVERE, null, ex);
+                EnviarReply reply = EnviarReply.newBuilder()
+                        .setData(dataFormatada)
+                        .setNome(req.getNome())
+                        .setStatus("ERROR" + ex.getMessage())
+                        .build();
+                responseObserver.onNext(reply);
+                responseObserver.onCompleted();
+            }
         }
 
         @Override
@@ -308,33 +352,56 @@ public class Servidor {
         @Override
         public void receber(ReceberRequest req, StreamObserver<ReceberReply> responseObserver) {
             file = req.getNome();
-            String erro = "";
-            ReceberReply.Builder reply = ReceberReply.newBuilder();
+            MessageDigest digest;
             try {
-                arquivo = new File(Servidor.saida + File.separator + file);
-                byte[] arq = Files.readAllBytes(arquivo.toPath());
-                long control = 0;
-                long size = arq.length;
-                int datalen = Integer.MAX_VALUE;
-                while ((control + datalen) < size) {
-                    reply = reply.addArquivo(ByteString.copyFrom(arq, (int) control, datalen));
-                    control += datalen;
-                }
-                reply.setTamanho(size);
-                reply = reply.addArquivo(ByteString.copyFrom(arq, (int) control, (int) (size - control)));
-            } catch (IOException e) {
-                erro = e.getClass().getSimpleName();
-            }
+                digest = MessageDigest.getInstance(Servidor.usedHash);
+                digest.update((Servidor.ip + Servidor.porta).getBytes());
+                BigInteger fileHash = new BigInteger(digest.digest());
+                if (((fileHash.compareTo(Servidor.prev) > 1) && (fileHash.compareTo(Servidor.p) < 1)) || (Servidor.prev.compareTo(Servidor.p) == 0)) {
+                    String erro = "";
+                    ReceberReply.Builder reply = ReceberReply.newBuilder();
+                    try {
+                        arquivo = new File(Servidor.saida + File.separator + file);
+                        byte[] arq = Files.readAllBytes(arquivo.toPath());
+                        long control = 0;
+                        long size = arq.length;
+                        int datalen = Integer.MAX_VALUE;
+                        while ((control + datalen) < size) {
+                            reply = reply.addArquivo(ByteString.copyFrom(arq, (int) control, datalen));
+                            control += datalen;
+                        }
+                        reply.setTamanho(size);
+                        reply = reply.addArquivo(ByteString.copyFrom(arq, (int) control, (int) (size - control)));
+                    } catch (IOException e) {
+                        erro = e.getClass().getSimpleName();
+                    }
 
-            dataFormatada = formatador.format(new Date()) + " GMT-3";
-            if (erro.equals("")) {
-                reply = reply.setStatus("OK");
-            } else {
-                reply = reply.setStatus("ERRO " + erro);
+                    dataFormatada = formatador.format(new Date()) + " GMT-3";
+                    if (erro.equals("")) {
+                        reply = reply.setStatus("OK");
+                    } else {
+                        reply = reply.setStatus("ERRO " + erro);
+                    }
+                    reply = reply.setData(dataFormatada).setNome(req.getNome());
+                    responseObserver.onNext(reply.build());
+                    responseObserver.onCompleted();
+                } else {
+                    ServerCli dest = Servidor.getOwner(fileHash);
+                    if (dest != null) {
+                        ReceberReply reply = dest.receber(req);
+                        responseObserver.onNext(reply);
+                        responseObserver.onCompleted();
+                    } else {
+                        ReceberReply reply = ReceberReply.newBuilder()
+                                .setStatus("ERROR")
+                                .build();
+                        responseObserver.onNext(reply);
+                        responseObserver.onCompleted();
+                    }
+                }
+            } catch (NoSuchAlgorithmException ex) {
+
             }
-            reply = reply.setData(dataFormatada).setNome(req.getNome());
-            responseObserver.onNext(reply.build());
-            responseObserver.onCompleted();
         }
 
         @Override
@@ -345,7 +412,8 @@ public class Servidor {
 
             ServerCli newSv = new ServerCli(ip, porta);
             //informa ao novo sv que este existe;
-            newSv.ping(Servidor.ip, Servidor.porta, Servidor.p.toString());
+            //PingReply preply = newSv.ping(Servidor.ip, Servidor.porta, Servidor.p.toString());
+            //System.out.println(preply.getStatus());
 
             boolean control = req.getControl();
             int ret = Arrays.binarySearch(ftReal, hash);
@@ -353,15 +421,17 @@ public class Servidor {
                 Servidor.map.put(hash, newSv);
                 Servidor.update();
             }
-            if (control) {
-                if (!Servidor.ft[0].equals(Servidor.p)) {
+            if (control) {//caso seja o primeiro a ser contactado
+                if (Servidor.ft[0].compareTo(Servidor.p) != 0) {
+                    // anel ja existe
                     transientids.add(hash);
 
                     AddSvRequest.Builder build = req.toBuilder();
                     build = build.setControl(false);
-                    responseObserver.onNext(Servidor.map.get(Servidor.ft[0]).repassar(build.build()));
+                    AddSvReply aReply = Servidor.map.get(Servidor.ft[0]).repassar(build.build());
+                    responseObserver.onNext(aReply.toBuilder().addHosts(Servidor.ip + ":" + Servidor.porta).build());
                 } else {
-                    //insere primeiro
+                    // cria anel
                     Servidor.prevCli = newSv;
                     Servidor.prev = hash;
                     Servidor.prevCli.enviarArquivos(Servidor.p, Servidor.prev);
@@ -369,27 +439,73 @@ public class Servidor {
                     Servidor.update();
                     AddSvReply reply = AddSvReply.newBuilder()
                             .setStatus("Ok")
+                            .addHosts(Servidor.ip + ":" + Servidor.porta)
                             .build();
                     responseObserver.onNext(reply);
                     Servidor.prevCli.enviarArquivos(Servidor.p, Servidor.prev);
                 }
             } else {
                 if (transientids.contains(hash)) {
+                    // chegou primeiro que foi contactado
                     transientids.remove(hash);
                     AddSvReply reply = AddSvReply.newBuilder()
                             .setStatus("Ok")
                             .build();
                     responseObserver.onNext(reply);
                 } else {
-                    responseObserver.onNext(Servidor.map.get(Servidor.ft[0]).repassar(req));
+                    // repassa para os outros servidores do anel
+                    if (Servidor.map.get(Servidor.ft[0]) == null) {
+                        AddSvReply reply = AddSvReply.newBuilder()
+                                .setStatus("Ok")
+                                .build();
+                        responseObserver.onNext(reply);
+                    } else {
+                        AddSvReply aReply = Servidor.map.get(Servidor.ft[0]).repassar(req);
+                        responseObserver.onNext(aReply.toBuilder().addHosts(Servidor.ip + ":" + Servidor.porta).build());
+                    }
                 }
             }
-            if (hash.compareTo(Servidor.prev) > 0 && !Servidor.ft[0].equals(Servidor.p)) {
-                //files owner
+            if ((hash.compareTo(Servidor.prev) > 0) && (hash.compareTo(Servidor.p) < 1)) {
+                // caso seja o servidor que contem os arquivos do servidor ingressante
                 Servidor.prevCli = newSv;
-                BigInteger oldPrev = Servidor.prev;
                 Servidor.prev = hash;
-                Servidor.prevCli.enviarArquivos(oldPrev, Servidor.prev);
+                arquivo = new File(Servidor.saida + File.separator);
+                MessageDigest digest;
+                BigInteger aux;
+                try {
+                    String[] lista = arquivo.list();
+                    for (String nome : lista) {
+                        digest = MessageDigest.getInstance(usedHash);
+                        digest.update(nome.getBytes());
+                        aux = new BigInteger(digest.digest());
+                        if (aux.compareTo(hash) < 1) {
+                            try {
+                                arquivo = new File(Servidor.saida + File.separator + nome);
+                                byte[] arq = Files.readAllBytes(arquivo.toPath());
+                                long controle = 0;
+                                long size = arq.length;
+                                int datalen = Integer.MAX_VALUE;
+                                EnviarRequest.Builder eReq = EnviarRequest.newBuilder().setNome(nome);
+                                while ((controle + datalen) < size) {
+                                    eReq = eReq.addArquivo(ByteString.copyFrom(arq, (int) controle, datalen));
+                                    controle += datalen;
+                                }
+                                eReq = eReq.setTamanho(size);
+                                eReq = eReq.addArquivo(ByteString.copyFrom(arq, (int) controle, (int) (size - controle)));
+                                dataFormatada = formatador.format(new Date()) + " GMT-3";
+                                eReq = eReq.setData(dataFormatada);
+                                EnviarReply reply = Servidor.prevCli.enviar(eReq.build());
+                                if (reply.getStatus().equals("OK")) {
+                                    Files.delete(arquivo.toPath());
+                                }
+                            } catch (IOException e) {
+                                logger.log(Level.INFO, e.getMessage());
+                            }
+                        }
+                    }
+                } catch (NoSuchAlgorithmException ex) {
+                    logger.log(Level.INFO, ex.getMessage());
+                }
             }
             responseObserver.onCompleted();
         }
@@ -402,19 +518,9 @@ public class Servidor {
             Servidor.map.put(hash, new ServerCli(ip, porta));
             Servidor.update();
             Servidor.purgeUnused();
-            responseObserver.onNext(PingReply.newBuilder().build());
+            responseObserver.onNext(PingReply.newBuilder().setStatus("OK").build());
             responseObserver.onCompleted();
         }
-
-        /*@Override
-        public StreamObserver<TransferirRequest> transferir(StreamObserver<TransferirReply> responseObserver) {
-            return null;
-        }*/
- /*
-        @Override
-        public void rTransferir(RTransferirRequest req, StreamObserver<RTransferirReply> responseObserver){
-            
-        }*/
         //RemoverServer (RmSvRequest) returns (RmSvReply)
     }
 }

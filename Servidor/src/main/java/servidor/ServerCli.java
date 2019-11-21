@@ -46,13 +46,21 @@ class ServerCli {
         return blockingStub.adicionarServer(req);
     }
     
-    public void ping(String ip, int porta, String hash){
+    public PingReply ping(String ip, int porta, String hash){
         PingRequest req = PingRequest.newBuilder()
                 .setIp(ip)
                 .setPorta(porta)
                 .setHash(hash)
                 .build();
-        blockingStub.ping(req);
+        return blockingStub.ping(req);
+    }
+    
+    public EnviarReply enviar(EnviarRequest req){
+        return blockingStub.enviar(req);
+    }
+    
+    public ReceberReply receber(ReceberRequest req){
+        return blockingStub.receber(req);
     }
     
     public void sair(){
