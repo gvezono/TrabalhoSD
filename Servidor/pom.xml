@@ -102,7 +102,7 @@
                             <mainClass>servidor.Servidor</mainClass>
                         </manifest>
                         <manifestEntries>
-                            <Class-Path>conf/</Class-Path>
+                            <Class-Path>${basedir}/target/conf/</Class-Path>
                         </manifestEntries>
                     </archive>
                 </configuration>
@@ -175,4 +175,30 @@
             <version>1.1.1</version>
         </dependency>
     </dependencies>
+    <profiles>
+          <profile>
+            <id>server0</id>
+            <activation>
+                <property>
+                    <name>server0</name>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <configuration>
+                            <executable>java</executable>
+                            <arguments>
+                                <argument>-classpath</argument>
+                                <classpath/>
+                                <argument>servidor.Servidor</argument>
+                            </arguments>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

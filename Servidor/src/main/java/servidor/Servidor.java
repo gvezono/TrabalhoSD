@@ -16,13 +16,12 @@ import io.grpc.ServerBuilder;
 import io.grpc.stub.StreamObserver;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigInteger;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
-import java.net.SocketException;
-import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -41,7 +40,6 @@ import java.util.Locale;
 import java.util.Properties;
 import java.util.TimeZone;
 import java.util.concurrent.ExecutionException;
-import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -52,36 +50,40 @@ public class Servidor extends StateMachine {
     private static final HashMap<BigInteger, ServerCli> map = new HashMap<BigInteger, ServerCli>();
     private static BigInteger[] ft, ftReal;
     private static final List<BigInteger> transientids = new ArrayList<BigInteger>();
+    
+    private static List<Address> addresses;
     //BigInteger = hash convertido para int, servercli = conexao com o servidor
 
-    private static int porta, porta_hash;
+    private static int porta, porta_hash, myId;
     private static String ip;
 
     private static ServerCli c, prevCli;
 
-    private static AtomixCli cli; //cliente do servidor de replicação
+    private static AtomixCli cli = null; //cliente do servidor de replicação
 
     private static String saida;
 
     private static String usedHash;
 
     //private final boolean restricao = false;
-    private Server server;
+    private static Server server;
 
     //ft
     private static int m; //128 (SHA-256)
     private static BigInteger p, prev; //hash ip+porta
 
-    public Servidor(int myId, int porta) throws SocketException, UnknownHostException, NoSuchAlgorithmException {
+    public Servidor() {
         try (final DatagramSocket socket = new DatagramSocket()) {
             socket.connect(InetAddress.getByName("8.8.8.8"), 10002);
             Servidor.ip = socket.getLocalAddress().getHostAddress();
-            Servidor.porta_hash = porta;
+        } catch (Exception ex) {
+
         }
         InputStream is = Servidor.class.getResourceAsStream("/app.properties");
         Properties prop = new Properties();
         try {
-            prop.load(is);
+            System.out.println(Servidor.class.getResource("/app.properties"));
+            prop.load(new FileInputStream("/app.properties"));
             Servidor.porta = Integer.parseInt(prop.getProperty("porta"));
             saida = prop.getProperty("saida");
             usedHash = prop.getProperty("hash");
@@ -92,7 +94,7 @@ public class Servidor extends StateMachine {
             m = (hash.length * 4);
             String newip;
             int newport;
-            if (prop.containsKey("servidor.ip") && prop.containsKey("servidor.porta") && myId == 0) {
+            if (prop.containsKey("servidor.ip") && prop.containsKey("servidor.porta") && Servidor.myId == 0) {
                 newip = prop.getProperty("servidor.ip");
                 newport = Integer.parseInt(prop.getProperty("servidor.porta"));
 
@@ -124,13 +126,21 @@ public class Servidor extends StateMachine {
             Servidor.porta = 50051;
             Servidor.saida = "SERVIDOR";
             usedHash = "SHA-256";
-            MessageDigest digest = MessageDigest.getInstance(usedHash);
-            digest.update((Servidor.ip + Servidor.porta_hash).getBytes());
-            byte[] hash = digest.digest();
-            p = new BigInteger(hash);
-            m = (hash.length * 4);
-            prev = p;
-            prevCli = null;
+            try {
+                MessageDigest digest = MessageDigest.getInstance(usedHash);
+
+                digest.update((Servidor.ip + Servidor.porta_hash).getBytes());
+                byte[] hash = digest.digest();
+
+                p = new BigInteger(hash);
+                m = (hash.length * 4);
+                prev = p;
+                prevCli = null;
+            } catch (Exception ex) {
+                //F
+            }
+        } catch (NoSuchAlgorithmException ex) {
+            Logger.getLogger(Servidor.class.getName()).log(Level.SEVERE, null, ex);
         }
         Path dirsv = Paths.get(Servidor.saida);
         if (Files.notExists(dirsv)) {
@@ -139,7 +149,7 @@ public class Servidor extends StateMachine {
         }
     }
 
-    private void start() throws IOException {
+    private static void start() throws IOException {
         server = ServerBuilder.forPort(Servidor.porta)
                 .addService(new ServerFuncImpl())
                 .maxInboundMessageSize(Integer.MAX_VALUE)
@@ -152,19 +162,19 @@ public class Servidor extends StateMachine {
             public void run() {
                 // Use stderr here since the logger may have been reset by its JVM shutdown hook.
                 System.err.println("*** shutting down gRPC server since JVM is shutting down");
-                Servidor.this.stop();
+                Servidor.stop();
                 System.err.println("*** server shut down");
             }
         });
     }
 
-    private void stop() {
+    private static void stop() {
         if (server != null) {
             server.shutdown();
         }
     }
 
-    private void blockUntilShutdown() throws InterruptedException {
+    private static void blockUntilShutdown() throws InterruptedException {
         if (server != null) {
             server.awaitTermination();
         }
@@ -260,23 +270,21 @@ public class Servidor extends StateMachine {
     }
 
     public static void main(String[] args) throws IOException, InterruptedException, NoSuchAlgorithmException {
-        int myId = Integer.parseInt(args[0]);
-        int porta_hash;
-        List<Address> addresses = new LinkedList<>();
+
+        Servidor.addresses = new LinkedList<>();
 
         for (int i = 1; i < args.length; i += 2) {
             Address address = new Address(args[i], Integer.parseInt(args[i + 1]));
-            addresses.add(address);
+            Servidor.addresses.add(address);
         }
-        
-        porta_hash = Integer.parseInt(args[2]);
-        
-        final Servidor server = new Servidor(myId, porta_hash);
-        server.start();
-        server.blockUntilShutdown();
 
-        CopycatServer.Builder builder = CopycatServer.builder(addresses.get(myId))
-                .withStateMachine((Supplier<StateMachine>) server)
+        Servidor.porta_hash = Integer.parseInt(args[2]);
+        Servidor.myId = Integer.parseInt(args[0]);
+
+        //final Servidor server = new Servidor();
+        //server.start();
+        CopycatServer.Builder builder = CopycatServer.builder(Servidor.addresses.get(Servidor.myId))
+                .withStateMachine(Servidor::new)
                 .withTransport(NettyTransport.builder()
                         .withThreads(4)
                         .build())
@@ -291,8 +299,8 @@ public class Servidor extends StateMachine {
         } else {
             sv.join(addresses).join();
         }
-
-        Servidor.cli = new AtomixCli(addresses);
+        Servidor.start();
+        Servidor.blockUntilShutdown();
     }
 
     public static EnviarReply enviar(Commit<EnviarCommand> commit) {
@@ -496,9 +504,9 @@ public class Servidor extends StateMachine {
                     Servidor.prevCli.enviarArquivos(Servidor.p, Servidor.prev);
                     Servidor.map.put(Servidor.prev, Servidor.prevCli);
                     Servidor.update();
-                    
+
                     Servidor.prevCli.enviarArquivos(Servidor.p, Servidor.prev);
-                    
+
                     reply = AddSvReply.newBuilder()
                             .setStatus("Ok")
                             .addHosts(Servidor.ip + ":" + Servidor.porta)
@@ -575,6 +583,7 @@ public class Servidor extends StateMachine {
 
         private ServerFuncImpl() {
             Servidor.create();
+            Servidor.cli = new AtomixCli(Servidor.addresses);
         }
 
         @Override

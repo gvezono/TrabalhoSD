@@ -8,13 +8,13 @@ import command.ReceberQuery;
 import io.atomix.catalyst.transport.Address;
 import io.atomix.catalyst.transport.netty.NettyTransport;
 import io.atomix.copycat.client.CopycatClient;
+import io.atomix.copycat.server.StateMachine;
 
-import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
-public class AtomixCli {
+public class AtomixCli extends StateMachine{
 
     private final List<Address> addresses;
 
