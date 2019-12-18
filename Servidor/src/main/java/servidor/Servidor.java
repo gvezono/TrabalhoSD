@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.TimeZone;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -50,13 +51,14 @@ public class Servidor extends StateMachine {
 
     private static final HashMap<BigInteger, ServerCli> map = new HashMap<BigInteger, ServerCli>();
     private static BigInteger[] ft, ftReal;
+    private static final List<BigInteger> transientids = new ArrayList<BigInteger>();
     //BigInteger = hash convertido para int, servercli = conexao com o servidor
 
     private static int porta;
     private static String ip;
 
     private static ServerCli c, prevCli;
-    
+
     private static AtomixCli cli; //cliente do servidor de replicação
 
     private static String saida;
@@ -285,63 +287,18 @@ public class Servidor extends StateMachine {
         } else {
             sv.join(addresses).join();
         }
-        
+
         Servidor.cli = new AtomixCli(addresses);
     }
 
     public static EnviarReply enviar(Commit<EnviarCommand> commit) {
         try {
-            EnviarCommand ec = commit.operation();
-            return null;
-        } finally {
-            commit.close();
-        }
-    }
-
-    public static ListarReply listar(Commit<ListarQuery> commit) {
-        try {
-            ListarQuery lq = commit.operation();
-            return null;
-        } finally {
-            commit.close();
-        }
-    }
-
-    public static ReceberReply receber(Commit<ReceberQuery> commit) {
-        try {
-            ReceberQuery rq = commit.operation();
-            return null;
-        } finally {
-            commit.close();
-        }
-    }
-
-    public static AddSvReply adicionarServer(Commit<AdicionarServerCommand> commit) {
-        try {
-            AdicionarServerCommand asc = commit.operation();
-            return null;
-        } finally {
-            commit.close();
-        }
-    }
-
-    static class ServerFuncImpl extends ServidorFuncGrpc.ServidorFuncImplBase {
-
-        private final SimpleDateFormat formatador = new SimpleDateFormat("E, dd MMM yyyy hh:mm:ss", Locale.ENGLISH);
-        private String dataFormatada;
-        private String file;
-        private File arquivo;
-
-        private static final List<BigInteger> transientids = new ArrayList<BigInteger>();
-
-        private ServerFuncImpl() {
+            EnviarRequest req = commit.operation().req;
+            String file = req.getNome();
+            String dataFormatada;
+            File arquivo;
+            SimpleDateFormat formatador = new SimpleDateFormat("E, dd MMM yyyy hh:mm:ss", Locale.ENGLISH);
             formatador.setTimeZone(TimeZone.getTimeZone("GMT-3"));
-            Servidor.create();
-        }
-
-        @Override
-        public void enviar(EnviarRequest req, StreamObserver<EnviarReply> responseObserver) {
-            file = req.getNome();
             MessageDigest digest;
             try {
                 digest = MessageDigest.getInstance(Servidor.usedHash);
@@ -370,38 +327,45 @@ public class Servidor extends StateMachine {
                             .setNome(req.getNome())
                             .setStatus("OK")
                             .build();
-                    responseObserver.onNext(reply);
-                    responseObserver.onCompleted();
+                    return reply;
                 } else {
                     ServerCli dest = Servidor.getOwner(fileHash);
                     if (dest != null) {
                         EnviarReply reply = dest.enviar(req);
-                        responseObserver.onNext(reply);
-                        responseObserver.onCompleted();
+                        return reply;
                     } else {
+                        dataFormatada = formatador.format(new Date()) + " GMT-3";
                         EnviarReply reply = EnviarReply.newBuilder()
                                 .setData(dataFormatada)
                                 .setNome(req.getNome())
                                 .setStatus("ERROR")
                                 .build();
-                        responseObserver.onNext(reply);
-                        responseObserver.onCompleted();
+                        return reply;
                     }
                 }
             } catch (NoSuchAlgorithmException ex) {
                 Logger.getLogger(Servidor.class.getName()).log(Level.SEVERE, null, ex);
+                dataFormatada = formatador.format(new Date()) + " GMT-3";
                 EnviarReply reply = EnviarReply.newBuilder()
                         .setData(dataFormatada)
                         .setNome(req.getNome())
                         .setStatus("ERROR" + ex.getMessage())
                         .build();
-                responseObserver.onNext(reply);
-                responseObserver.onCompleted();
+                return reply;
             }
+        } finally {
+            commit.close();
         }
+    }
 
-        @Override
-        public void listar(ListarRequest req, StreamObserver<ListarReply> responseObserver) {
+    public static ListarReply listar(Commit<ListarQuery> commit) {
+        try {
+            ListarRequest req = commit.operation().req;
+            String dataFormatada;
+            File arquivo;
+            SimpleDateFormat formatador = new SimpleDateFormat("E, dd MMM yyyy hh:mm:ss", Locale.ENGLISH);
+            formatador.setTimeZone(TimeZone.getTimeZone("GMT-3"));
+
             arquivo = new File(Servidor.saida + File.separator);
             String[] lista = arquivo.list();
             String erro = "";
@@ -422,13 +386,20 @@ public class Servidor extends StateMachine {
             }
             reply = reply.setStatus(status);
             reply = reply.setData(dataFormatada);
-            responseObserver.onNext(reply.build());
-            responseObserver.onCompleted();
+            return reply.build();
+        } finally {
+            commit.close();
         }
+    }
 
-        @Override
-        public void receber(ReceberRequest req, StreamObserver<ReceberReply> responseObserver) {
-            file = req.getNome();
+    public static ReceberReply receber(Commit<ReceberQuery> commit) {
+        try {
+            ReceberRequest req = commit.operation().req;
+            String dataFormatada;
+            File arquivo;
+            SimpleDateFormat formatador = new SimpleDateFormat("E, dd MMM yyyy hh:mm:ss", Locale.ENGLISH);
+            formatador.setTimeZone(TimeZone.getTimeZone("GMT-3"));
+            String file = req.getNome();
             MessageDigest digest;
             try {
                 digest = MessageDigest.getInstance(Servidor.usedHash);
@@ -460,34 +431,44 @@ public class Servidor extends StateMachine {
                         reply = reply.setStatus("ERRO " + erro);
                     }
                     reply = reply.setData(dataFormatada).setNome(req.getNome());
-                    responseObserver.onNext(reply.build());
-                    responseObserver.onCompleted();
+                    return reply.build();
                 } else {
                     ServerCli dest = Servidor.getOwner(fileHash);
                     if (dest != null) {
                         ReceberReply reply = dest.receber(req);
-                        responseObserver.onNext(reply);
-                        responseObserver.onCompleted();
+                        return reply;
                     } else {
                         ReceberReply reply = ReceberReply.newBuilder()
                                 .setStatus("ERROR")
                                 .build();
-                        responseObserver.onNext(reply);
-                        responseObserver.onCompleted();
+                        return reply;
                     }
                 }
             } catch (NoSuchAlgorithmException ex) {
-
+                Logger.getLogger(Servidor.class.getName()).log(Level.SEVERE, null, ex);
+                ReceberReply reply = ReceberReply.newBuilder()
+                        .setStatus("ERROR " + ex.getMessage())
+                        .build();
+                return reply;
             }
+        } finally {
+            commit.close();
         }
+    }
 
-        @Override
-        public void adicionarServer(AddSvRequest req, StreamObserver<AddSvReply> responseObserver) {
+    public static AddSvReply adicionarServer(Commit<AdicionarServerCommand> commit) {
+        try {
+            AddSvRequest req = commit.operation().req;
+            AddSvReply reply;
+            String dataFormatada;
+            File arquivo;
+            SimpleDateFormat formatador = new SimpleDateFormat("E, dd MMM yyyy hh:mm:ss", Locale.ENGLISH);
+            formatador.setTimeZone(TimeZone.getTimeZone("GMT-3"));
             BigInteger hash = new BigInteger(req.getHash());
-            String ip = req.getIp();
-            int porta = req.getPorta();
+            String ipl = req.getIp();
+            int portal = req.getPorta();
 
-            ServerCli newSv = new ServerCli(ip, porta);
+            ServerCli newSv = new ServerCli(ipl, portal);
 
             boolean control = req.getControl();
             int ret = Arrays.binarySearch(ftReal, hash);
@@ -503,7 +484,7 @@ public class Servidor extends StateMachine {
                     AddSvRequest.Builder build = req.toBuilder();
                     build = build.setControl(false);
                     AddSvReply aReply = Servidor.map.get(Servidor.ft[0]).repassar(build.build());
-                    responseObserver.onNext(aReply.toBuilder().addHosts(Servidor.ip + ":" + Servidor.porta).build());
+                    reply = aReply.toBuilder().addHosts(Servidor.ip + ":" + Servidor.porta).build();
                 } else {
                     // cria anel
                     Servidor.prevCli = newSv;
@@ -511,31 +492,30 @@ public class Servidor extends StateMachine {
                     Servidor.prevCli.enviarArquivos(Servidor.p, Servidor.prev);
                     Servidor.map.put(Servidor.prev, Servidor.prevCli);
                     Servidor.update();
-                    AddSvReply reply = AddSvReply.newBuilder()
+                    
+                    Servidor.prevCli.enviarArquivos(Servidor.p, Servidor.prev);
+                    
+                    reply = AddSvReply.newBuilder()
                             .setStatus("Ok")
                             .addHosts(Servidor.ip + ":" + Servidor.porta)
                             .build();
-                    responseObserver.onNext(reply);
-                    Servidor.prevCli.enviarArquivos(Servidor.p, Servidor.prev);
                 }
             } else {
                 if (transientids.contains(hash)) {
                     // chegou primeiro que foi contactado
                     transientids.remove(hash);
-                    AddSvReply reply = AddSvReply.newBuilder()
+                    reply = AddSvReply.newBuilder()
                             .setStatus("Ok")
                             .build();
-                    responseObserver.onNext(reply);
                 } else {
                     // repassa para os outros servidores do anel
                     if (Servidor.map.get(Servidor.ft[0]) == null) {
-                        AddSvReply reply = AddSvReply.newBuilder()
+                        reply = AddSvReply.newBuilder()
                                 .setStatus("Ok")
                                 .build();
-                        responseObserver.onNext(reply);
                     } else {
                         AddSvReply aReply = Servidor.map.get(Servidor.ft[0]).repassar(req);
-                        responseObserver.onNext(aReply.toBuilder().addHosts(Servidor.ip + ":" + Servidor.porta).build());
+                        reply = aReply.toBuilder().addHosts(Servidor.ip + ":" + Servidor.porta).build();
                     }
                 }
             }
@@ -568,8 +548,8 @@ public class Servidor extends StateMachine {
                                 eReq = eReq.addArquivo(ByteString.copyFrom(arq, (int) controle, (int) (size - controle)));
                                 dataFormatada = formatador.format(new Date()) + " GMT-3";
                                 eReq = eReq.setData(dataFormatada);
-                                EnviarReply reply = Servidor.prevCli.enviar(eReq.build());
-                                if (reply.getStatus().equals("OK")) {
+                                EnviarReply rp = Servidor.prevCli.enviar(eReq.build());
+                                if (rp.getStatus().equals("OK")) {
                                     Files.delete(arquivo.toPath());
                                 }
                             } catch (IOException e) {
@@ -581,7 +561,89 @@ public class Servidor extends StateMachine {
                     logger.log(Level.INFO, ex.getMessage());
                 }
             }
-            responseObserver.onCompleted();
+            return reply;
+        } finally {
+            commit.close();
+        }
+    }
+
+    static class ServerFuncImpl extends ServidorFuncGrpc.ServidorFuncImplBase {
+
+        private ServerFuncImpl() {
+            Servidor.create();
+        }
+
+        @Override
+        public void enviar(EnviarRequest req, StreamObserver<EnviarReply> responseObserver) {
+            try {
+                responseObserver.onNext(Servidor.cli.enviar(req));
+                responseObserver.onCompleted();
+            } catch (InterruptedException | ExecutionException ex) {
+                Logger.getLogger(Servidor.class.getName()).log(Level.SEVERE, null, ex);
+                SimpleDateFormat formatador = new SimpleDateFormat("E, dd MMM yyyy hh:mm:ss", Locale.ENGLISH);
+                formatador.setTimeZone(TimeZone.getTimeZone("GMT-3"));
+                String dataFormatada = formatador.format(new Date()) + " GMT-3";
+                EnviarReply reply = EnviarReply.newBuilder()
+                        .setData(dataFormatada)
+                        .setNome(req.getNome())
+                        .setStatus("ERROR " + ex.getMessage())
+                        .build();
+                responseObserver.onNext(reply);
+                responseObserver.onCompleted();
+            }
+        }
+
+        @Override
+        public void listar(ListarRequest req, StreamObserver<ListarReply> responseObserver) {
+            try {
+                responseObserver.onNext(Servidor.cli.listar(req));
+                responseObserver.onCompleted();
+            } catch (InterruptedException | ExecutionException ex) {
+                Logger.getLogger(Servidor.class.getName()).log(Level.SEVERE, null, ex);
+                SimpleDateFormat formatador = new SimpleDateFormat("E, dd MMM yyyy hh:mm:ss", Locale.ENGLISH);
+                formatador.setTimeZone(TimeZone.getTimeZone("GMT-3"));
+                String dataFormatada = formatador.format(new Date()) + " GMT-3";
+                ListarReply reply = ListarReply.newBuilder()
+                        .setData(dataFormatada)
+                        .setStatus("ERROR " + ex.getMessage())
+                        .build();
+                responseObserver.onNext(reply);
+                responseObserver.onCompleted();
+            }
+        }
+
+        @Override
+        public void receber(ReceberRequest req, StreamObserver<ReceberReply> responseObserver) {
+            try {
+                responseObserver.onNext(Servidor.cli.receber(req));
+                responseObserver.onCompleted();
+            } catch (InterruptedException | ExecutionException ex) {
+                Logger.getLogger(Servidor.class.getName()).log(Level.SEVERE, null, ex);
+                SimpleDateFormat formatador = new SimpleDateFormat("E, dd MMM yyyy hh:mm:ss", Locale.ENGLISH);
+                formatador.setTimeZone(TimeZone.getTimeZone("GMT-3"));
+                String dataFormatada = formatador.format(new Date()) + " GMT-3";
+                ReceberReply reply = ReceberReply.newBuilder()
+                        .setData(dataFormatada)
+                        .setStatus("ERROR " + ex.getMessage())
+                        .build();
+                responseObserver.onNext(reply);
+                responseObserver.onCompleted();
+            }
+        }
+
+        @Override
+        public void adicionarServer(AddSvRequest req, StreamObserver<AddSvReply> responseObserver) {
+            try {
+                responseObserver.onNext(Servidor.cli.adicionarServer(req));
+                responseObserver.onCompleted();
+            } catch (InterruptedException | ExecutionException ex) {
+                Logger.getLogger(Servidor.class.getName()).log(Level.SEVERE, null, ex);
+                AddSvReply reply = AddSvReply.newBuilder()
+                        .setStatus("ERROR " + ex.getMessage())
+                        .build();
+                responseObserver.onNext(reply);
+                responseObserver.onCompleted();
+            }
         }
     }
 }
