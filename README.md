@@ -45,13 +45,13 @@ cd Servidor && mvn install && cd ..
 ```
   - Cliente
 ```
-cd Cliente && mvn install jar && cd ..
+cd Cliente && mvn install && cd ..
 ```
 
 ### Executando
   - Servidor
 ```
-java -jar Servidor/target/Servidor-1.0-jar-with-dependcies.jar 0 127.0.0.1 50052 127.0.0.1 50053 127.0.0.1 50054
+java -jar Servidor/target/Servidor-1.0-jar-with-dependencies.jar 0 127.0.0.1 50052 127.0.0.1 50053 127.0.0.1 50054
 ```
   - Cliente
 ```
