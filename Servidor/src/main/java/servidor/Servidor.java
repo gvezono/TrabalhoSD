@@ -1,6 +1,14 @@
 package servidor;
 
 import io.atomix.copycat.server.StateMachine;
+import io.atomix.copycat.server.Commit;
+import io.atomix.catalyst.transport.Address;
+import io.atomix.catalyst.transport.netty.NettyTransport;
+import io.atomix.copycat.server.CopycatServer;
+import io.atomix.copycat.server.storage.Storage;
+import io.atomix.copycat.server.storage.StorageLevel;
+
+import command.*;
 
 import com.google.protobuf.ByteString;
 import io.grpc.Server;
@@ -27,14 +35,16 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.TimeZone;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class Servidor {
+public class Servidor extends StateMachine {
 
     private static final Logger logger = Logger.getLogger(Servidor.class.getName());
 
@@ -46,6 +56,8 @@ public class Servidor {
     private static String ip;
 
     private static ServerCli c, prevCli;
+    
+    private static AtomixCli cli; //cliente do servidor de replicação
 
     private static String saida;
 
@@ -248,6 +260,69 @@ public class Servidor {
         final Servidor server = new Servidor();
         server.start();
         server.blockUntilShutdown();
+
+        int myId = Integer.parseInt(args[0]);
+        List<Address> addresses = new LinkedList<>();
+
+        for (int i = 1; i < args.length; i += 2) {
+            Address address = new Address(args[i], Integer.parseInt(args[i + 1]));
+            addresses.add(address);
+        }
+
+        CopycatServer.Builder builder = CopycatServer.builder(addresses.get(myId))
+                .withStateMachine((Supplier<StateMachine>) server)
+                .withTransport(NettyTransport.builder()
+                        .withThreads(4)
+                        .build())
+                .withStorage(Storage.builder()
+                        .withDirectory(new File("logs_" + myId)) //Must be unique
+                        .withStorageLevel(StorageLevel.DISK)
+                        .build());
+        CopycatServer sv = builder.build();
+
+        if (myId == 0) {
+            sv.bootstrap().join();
+        } else {
+            sv.join(addresses).join();
+        }
+        
+        Servidor.cli = new AtomixCli(addresses);
+    }
+
+    public static EnviarReply enviar(Commit<EnviarCommand> commit) {
+        try {
+            EnviarCommand ec = commit.operation();
+            return null;
+        } finally {
+            commit.close();
+        }
+    }
+
+    public static ListarReply listar(Commit<ListarQuery> commit) {
+        try {
+            ListarQuery lq = commit.operation();
+            return null;
+        } finally {
+            commit.close();
+        }
+    }
+
+    public static ReceberReply receber(Commit<ReceberQuery> commit) {
+        try {
+            ReceberQuery rq = commit.operation();
+            return null;
+        } finally {
+            commit.close();
+        }
+    }
+
+    public static AddSvReply adicionarServer(Commit<AdicionarServerCommand> commit) {
+        try {
+            AdicionarServerCommand asc = commit.operation();
+            return null;
+        } finally {
+            commit.close();
+        }
     }
 
     static class ServerFuncImpl extends ServidorFuncGrpc.ServidorFuncImplBase {
