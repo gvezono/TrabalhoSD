@@ -72,7 +72,7 @@ public class Servidor extends StateMachine {
     private static int m; //128 (SHA-256)
     private static BigInteger p, prev; //hash ip+porta
 
-    public Servidor() throws SocketException, UnknownHostException, NoSuchAlgorithmException {
+    public Servidor(int myId) throws SocketException, UnknownHostException, NoSuchAlgorithmException {
         try (final DatagramSocket socket = new DatagramSocket()) {
             socket.connect(InetAddress.getByName("8.8.8.8"), 10002);
             Servidor.ip = socket.getLocalAddress().getHostAddress();
@@ -91,7 +91,7 @@ public class Servidor extends StateMachine {
             m = (hash.length * 4);
             String newip;
             int newport;
-            if (prop.containsKey("servidor.ip") && prop.containsKey("servidor.porta")) {
+            if (prop.containsKey("servidor.ip") && prop.containsKey("servidor.porta") && myId == 0) {
                 newip = prop.getProperty("servidor.ip");
                 newport = Integer.parseInt(prop.getProperty("servidor.porta"));
 
@@ -259,11 +259,12 @@ public class Servidor extends StateMachine {
     }
 
     public static void main(String[] args) throws IOException, InterruptedException, NoSuchAlgorithmException {
-        final Servidor server = new Servidor();
+        int myId = Integer.parseInt(args[0]);
+        
+        final Servidor server = new Servidor(myId);
         server.start();
         server.blockUntilShutdown();
 
-        int myId = Integer.parseInt(args[0]);
         List<Address> addresses = new LinkedList<>();
 
         for (int i = 1; i < args.length; i += 2) {
