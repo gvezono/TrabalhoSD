@@ -1,5 +1,7 @@
 package servidor;
 
+import io.atomix.copycat.server.StateMachine;
+
 import com.google.protobuf.ByteString;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
@@ -411,9 +413,6 @@ public class Servidor {
             int porta = req.getPorta();
 
             ServerCli newSv = new ServerCli(ip, porta);
-            //informa ao novo sv que este existe;
-            //PingReply preply = newSv.ping(Servidor.ip, Servidor.porta, Servidor.p.toString());
-            //System.out.println(preply.getStatus());
 
             boolean control = req.getControl();
             int ret = Arrays.binarySearch(ftReal, hash);
@@ -509,18 +508,5 @@ public class Servidor {
             }
             responseObserver.onCompleted();
         }
-
-        @Override
-        public void ping(PingRequest req, StreamObserver<PingReply> responseObserver) {
-            String ip = req.getIp();
-            int porta = req.getPorta();
-            BigInteger hash = new BigInteger(req.getHash());
-            Servidor.map.put(hash, new ServerCli(ip, porta));
-            Servidor.update();
-            Servidor.purgeUnused();
-            responseObserver.onNext(PingReply.newBuilder().setStatus("OK").build());
-            responseObserver.onCompleted();
-        }
-        //RemoverServer (RmSvRequest) returns (RmSvReply)
     }
 }

@@ -16,10 +16,6 @@ service ServidorFunc {
 	rpc Receber (ReceberRequest) returns (ReceberReply) {}
 
         rpc AdicionarServer (AddSvRequest) returns (AddSvReply) {}
-
-        rpc Ping (PingRequest) returns (PingReply) {}
-
-        rpc RemoverServer (RmSvRequest) returns (RmSvReply) {}
 }
 
 message EnviarRequest {
@@ -68,22 +64,4 @@ message AddSvRequest {
 message AddSvReply {
         string status = 1;
         repeated string hosts = 2;
-}
-
-message RmSvRequest {
-        int64 numeroArquivos = 1;
-}
-
-message RmSvReply {
-        string status = 1;
-}
-
-message PingRequest {
-        string ip = 1;
-        int32 porta = 2;
-        string hash = 3;
-}
-
-message PingReply {
-        string status = 1;
 }
