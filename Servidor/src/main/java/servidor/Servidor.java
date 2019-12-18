@@ -50,7 +50,7 @@ public class Servidor extends StateMachine {
     private static final HashMap<BigInteger, ServerCli> map = new HashMap<BigInteger, ServerCli>();
     private static BigInteger[] ft, ftReal;
     private static final List<BigInteger> transientids = new ArrayList<BigInteger>();
-    
+
     private static List<Address> addresses;
     //BigInteger = hash convertido para int, servercli = conexao com o servidor
 
@@ -77,13 +77,20 @@ public class Servidor extends StateMachine {
             socket.connect(InetAddress.getByName("8.8.8.8"), 10002);
             Servidor.ip = socket.getLocalAddress().getHostAddress();
         } catch (Exception ex) {
-
+            Servidor.ip = "127.0.0.1";
+            Logger.getLogger(Servidor.class.getName()).log(Level.SEVERE, null, "Ip set to 127.0.0.1" + ex.getMessage());
         }
-        InputStream is = Servidor.class.getResourceAsStream("/app.properties");
-        Properties prop = new Properties();
+
         try {
-            System.out.println(Servidor.class.getResource("/app.properties"));
-            prop.load(new FileInputStream("/app.properties"));
+            String propfile = System.getProperty("java.class.path");
+            Path path = Paths.get(propfile);
+            path = path.getParent();
+            propfile = path.toAbsolutePath().toString() + File.separator + "conf";
+            path = Paths.get(propfile);
+            InputStream is = new FileInputStream(path.toString() + File.separator + "app.properties");
+            Properties prop = new Properties();
+
+            prop.load(is);
             Servidor.porta = Integer.parseInt(prop.getProperty("porta"));
             saida = prop.getProperty("saida");
             usedHash = prop.getProperty("hash");
@@ -123,7 +130,7 @@ public class Servidor extends StateMachine {
             }
         } catch (IOException | NumberFormatException e) {
             logger.log(Level.INFO, e.toString());
-            Servidor.porta = 50051;
+            Servidor.porta = 50051 + Servidor.myId;
             Servidor.saida = "SERVIDOR";
             usedHash = "SHA-256";
             try {
@@ -136,8 +143,8 @@ public class Servidor extends StateMachine {
                 m = (hash.length * 4);
                 prev = p;
                 prevCli = null;
-            } catch (Exception ex) {
-                //F
+            } catch (NoSuchAlgorithmException ex) {
+                Logger.getLogger(Servidor.class.getName()).log(Level.SEVERE, null, "Java error " + ex.getMessage());
             }
         } catch (NoSuchAlgorithmException ex) {
             Logger.getLogger(Servidor.class.getName()).log(Level.SEVERE, null, ex);
